@@ -10,6 +10,7 @@ All notable changes to Hexhaven. The game reads this file too: the version in th
 
 ### Improved
 - Desktop status bar is compact: season icon, year, timeline, round and your actions. Longer explanations show on hover.
+- On medium-sized screens the status bar sits next to the player cards, with the timeline as a second row, so it never runs under the resources.
 - One icon style everywhere: trade, market and order dialogs use the same coloured resource icons as the top bar, and seasons have their own icons.
 - Scouted finds that sit next to each other join into one sand bank instead of separate islets.
 - Phones: the turn banner is one small line, and an opponent's turn is shown once, at the bottom.

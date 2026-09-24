@@ -669,7 +669,7 @@ function renderStatus() {
     <span class="seg" data-tip="${S.name} · Year ${game.year}"><span class="sem">${svg(S.icon)}</span><b>Y${game.year}</b></span>
     <i class="vdiv"></i>
     <span class="tl-slot"></span>
-    <b class="seg rnd">${game.round}<span class="of">/${game.lastRound}</span></b>
+    <button class="seg rnd tl-open" data-act="timeline" title="What's coming">${game.round}<span class="of">/${game.lastRound}</span></button>
     <i class="vdiv"></i>
     ${placing
       ? '<span class="seg"><span class="lbl">Place a tile</span></span>'

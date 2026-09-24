@@ -1047,3 +1047,15 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 #modal .mclose:hover { background: rgba(47, 58, 54, 0.12); color: var(--ink); }
 #modal .mclose .ic { width: 16px; height: 16px; }
 #modal .mbody > h2:first-child { padding-right: 40px; }
+
+/* medium screens: the status bar moves next to the player cards so it never runs under the
+   resource bar; the timeline becomes a second row inside it */
+@media (min-width: 761px) and (max-width: 1350px) {
+  #status { left: 208px; transform: none; flex-wrap: wrap; justify-content: center; row-gap: 2px; border-radius: 18px; padding: 6px 16px; max-width: 420px; }
+  #status .tl-slot { order: 10; flex-basis: 100%; display: flex; justify-content: center; }
+  #status .tl-slot + .rnd { margin-left: 0; }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  #status { max-width: none; }
+  #status .tl-slot { display: none; }
+}
