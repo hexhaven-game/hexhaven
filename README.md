@@ -8,7 +8,7 @@ opponents. Built with three.js: no backend, no install.
 
 **▶ Play now: <https://hexhaven-game.github.io/hexhaven/>**
 
-![Hexhaven title screen](https://hexhaven-game.github.io/hexhaven/og-image.png)
+![Hexhaven in play: hexagon landscape tiles on the board, rival towns and the tile hand](https://hexhaven-game.github.io/hexhaven/og-image.png)
 
 ## What is Hexhaven?
 
