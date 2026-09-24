@@ -39,6 +39,7 @@ export function createWaterMaterial(maskTex, extent) {
         uSand: { value: new THREE.Color(0xf3e3b3) },
         uFoam: { value: new THREE.Color(0xffffff) },
         uSunDir: { value: new THREE.Vector3(10, 22, 12).normalize() },
+        uShore: { value: 1 },
       },
     ]),
     vertexShader: /* glsl */ `
@@ -59,12 +60,16 @@ export function createWaterMaterial(maskTex, extent) {
       uniform sampler2D uMask;
       uniform float uExtent;
       uniform vec3 uDeep, uShallow, uSand, uFoam, uSunDir;
+      uniform float uShore;
       varying vec3 vWorld;
       #include <fog_pars_fragment>
       ${NOISE}
       void main() {
         float t = uTime;
-        vec4 mask = texture2D(uMask, vWorld.xz / (uExtent * 2.0) + 0.5);
+        // uShore scales the whole coastline mask around the world origin, so the sand and foam
+        // grow out of the sea in one smooth move while the banks are coming up
+        vec2 maskUv = vWorld.xz / (uExtent * 2.0 * uShore) + 0.5;
+        vec4 mask = texture2D(uMask, maskUv);
         float coast = mask.r;   // narrow falloff around the tiles
         float shelf = mask.g;   // wide falloff: shallow water
 
@@ -85,7 +90,8 @@ export function createWaterMaterial(maskTex, extent) {
         col = mix(col, uFoam, rings * 0.28);
 
         // sandy rim right at the tile edges, with a foam line that breathes
-        float wob = (noise(vWorld.xz * 3.0 + t * 0.4) - 0.5) * 0.06 + sin(t * 1.3) * 0.015;
+        // keep the rim and foam line hugging the hexagonal coast instead of wobbling into a beach
+        float wob = (noise(vWorld.xz * 3.0 + t * 0.4) - 0.5) * 0.014 + sin(t * 1.3) * 0.005;
         float sand = smoothstep(0.34, 0.42, coast + wob * 0.5);
         col = mix(col, uSand, sand);
         float f = coast + wob;

@@ -1014,6 +1014,10 @@ const BG_COLORS = [0xbfe3ee, 0xc4e8f2, 0xdfe0d4, 0xdbe7ee];
 const WATER_Y = 0.08;
 const MASK_EXTENT = 18;
 const MASK_SIZE = 512;
+const SHORE_OUT = 0.44;                   // how far the sand runs out before it is under water
+const SHORE_WATERLINE = 0.62;             // the dry part of that slope
+const COAST_R = 1 + SHORE_OUT * SHORE_WATERLINE * 1.1547; // where the mask puts the shoreline
+const NO_TILES = new Map();
 const GHOST_CAP = 400;
 const HL_MAT = new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.9, depthWrite: false });
 
@@ -1101,9 +1105,12 @@ export class World3D {
     scene.add(water);
     this.maskDirty = true;
     this.maskTimer = 0;
-    // sandy beach sloping from every open coast edge into the sea (one merged mesh)
-    this.shore = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshToonMaterial({ vertexColors: true, gradientMap }));
+    // hexagonal beaches: sand running from every open coast edge down into the sea (one merged mesh)
+    this.shore = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshToonMaterial({
+      vertexColors: true, gradientMap, side: THREE.DoubleSide,
+    }));
     this.shore.receiveShadow = true;
+    this.shore.position.y = 0;
     scene.add(this.shore);
 
     // landing marker under the held tile
@@ -1378,6 +1385,7 @@ export class World3D {
     this.validSet = new Set();
     this.highlightKeys = new Set();
     this.previewType = null;
+    this.shore.position.y = 0;
   }
 
   loadAll() {
@@ -1391,6 +1399,23 @@ export class World3D {
 
   // Menu -> game without a cut: the menu island sinks away from the rim inwards while the real
   // world drops in from the centre outwards, and the camera glides from the menu view to the player
+  // The sandbanks are always first: they well up out of the sea, then the tiles land on them
+  revealLand(dur = 1.1) {
+    const s = this.shore;
+    s.scale.set(1, 1, 1);
+    s.position.set(0, -0.5, 0);
+    this.waterMat.uniforms.uShore.value = 0.35;
+    this.animate(dur, (k) => {
+      const e = 1 - (1 - k) ** 2.2;
+      s.position.y = -0.5 * (1 - e);
+      this.waterMat.uniforms.uShore.value = 0.35 + 0.65 * e;
+    }, () => {
+      s.position.y = 0;
+      this.waterMat.uniforms.uShore.value = 1;
+    });
+    return dur;
+  }
+
   transitionTo(homeKey) {
     const old = [...this.tileObjs.values()];
     this.tileObjs = new Map();
@@ -1422,11 +1447,15 @@ export class World3D {
       }, () => this.disposeTile(o), delay);
     }
 
+    // beaches first: build the whole coastline up front and let it rise out of the water
+    this.updateMask(true);
+    const beach = this.revealLand(0.9);
+
     const fresh = [...this.game.tiles.values()].map((t) => {
       const { x, z } = toWorld(t.key);
       return { t, d: Math.hypot(x, z) };
     }).sort((a, b) => a.d - b.d);
-    const start = Math.min(0.9, maxD * 0.045 * 0.6);
+    const start = beach + Math.min(0.9, maxD * 0.045 * 0.6);
     let last = 0;
     // tiles are built from a queue with a per-frame time budget (see tick), each one starting its
     // fall when it is built; on a full map that keeps every frame light while the wave rolls out
@@ -1454,12 +1483,14 @@ export class World3D {
   // Title sequence: the island assembles itself in rings while the camera swoops in
   playIntro() {
     this.reset();
+    this.updateMask(true);
+    const beach = this.revealLand(1.15);
     const tiles = [...this.game.tiles.values()].map((t) => {
       const { x, z } = toWorld(t.key);
       return { t, d: Math.hypot(x, z) };
     }).sort((a, b) => a.d - b.d);
-    tiles.forEach(({ t, d }) => this.addTile(t, true, 0.5 + d * 0.13 + Math.random() * 0.15));
-    const last = 0.5 + tiles[tiles.length - 1].d * 0.13 + 0.6;
+    tiles.forEach(({ t, d }) => this.addTile(t, true, beach + 0.1 + d * 0.13 + Math.random() * 0.15));
+    const last = beach + 0.1 + tiles[tiles.length - 1].d * 0.13 + 0.6;
     this.animate(0.01, () => {}, () => { this.syncFrontier(); this.syncBadges(); }, last);
     this.controls.autoRotate = false;
     const from = new THREE.Vector3(0.5, 42, 3);
@@ -1748,38 +1779,69 @@ export class World3D {
     }
   }
 
+  // A hexagonal beach: sand runs from the tile edge down into the sea in straight bands, mitred
+  // on the outer corners so the whole coastline follows the hex grid instead of wandering.
+  // The land set is the game's tiles; before a world is set up there is simply nothing to draw.
+  landTiles() {
+    return this.game.tiles ?? NO_TILES;
+  }
+
   buildShore() {
-    const keys = this.tileObjs;
+    const tiles = this.landTiles();
     const pos = [];
     const col = [];
-    const dry = new THREE.Color(0xf4e0a4);
-    const wet = new THREE.Color(0xd6bd82);
-    const yTop = 0.17;
-    const yBot = WATER_Y - 0.06;
-    const out = 0.4;
-    for (const k of keys.keys()) {
-      const c = toWorld(k);
+    const dry = new THREE.Color(0xf7e8ba);
+    const wet = new THREE.Color(0xd3b87e);
+    const shade = new THREE.Color();
+    const bands = 3;
+    const yTop = 0.2;              // where the sand meets the tile
+    const yBot = -0.12;            // the last band is under water, so the beach walks into the sea
+    const out = SHORE_OUT;
+    for (const t of tiles.values()) {
+      const c = toWorld(t.key);
       for (let i = 0; i < 6; i++) {
         const a0 = Math.PI / 2 + (i * Math.PI) / 3;
         const a1 = a0 + Math.PI / 3;
         const am = a0 + Math.PI / 6;
         const nx = Math.cos(am);
         const nz = Math.sin(am);
-        if (keys.has(hexKeyAt(c.x + nx * Math.sqrt(3), c.z + nz * Math.sqrt(3)))) continue;
+        if (tiles.has(hexKeyAt(c.x + nx * Math.sqrt(3), c.z + nz * Math.sqrt(3)))) continue;
         const v0x = c.x + Math.cos(a0);
         const v0z = c.z + Math.sin(a0);
         const v1x = c.x + Math.cos(a1);
         const v1z = c.z + Math.sin(a1);
-        // mitred outer corners so neighbouring beach strips meet on convex corners
         const ex = (v1x - v0x);
         const ez = (v1z - v0z);
-        const m = out * 0.577;
-        const o0x = v0x + nx * out - ex * m;
-        const o0z = v0z + nz * out - ez * m;
-        const o1x = v1x + nx * out + ex * m;
-        const o1z = v1z + nz * out + ez * m;
-        pos.push(v0x, yTop, v0z, o1x, yBot, o1z, v1x, yTop, v1z, v0x, yTop, v0z, o0x, yBot, o0z, o1x, yBot, o1z);
-        for (const c2 of [dry, wet, dry, dry, wet, wet]) col.push(c2.r, c2.g, c2.b);
+        // walk outwards in bands, down the slope; every ring is mitred the same way, so the
+        // bands stay parallel to the hexagon edge and neighbours meet exactly on the corners
+        let px0 = v0x;
+        let pz0 = v0z;
+        let px1 = v1x;
+        let pz1 = v1z;
+        let py = yTop;
+        for (let b = 1; b <= bands; b++) {
+          const t0 = b / bands;
+          const m = out * t0 * 0.577;
+          const q0x = v0x + nx * out * t0 - ex * m;
+          const q0z = v0z + nz * out * t0 - ez * m;
+          const q1x = v1x + nx * out * t0 + ex * m;
+          const q1z = v1z + nz * out * t0 + ez * m;
+          const qy = yTop + (yBot - yTop) * t0 ** 1.9;
+          shade.copy(dry).lerp(wet, (b - 1) / bands);
+          const inR = shade.r;
+          const inG = shade.g;
+          const inB = shade.b;
+          shade.copy(dry).lerp(wet, t0);
+          pos.push(px0, py, pz0, q1x, qy, q1z, px1, py, pz1);
+          pos.push(px0, py, pz0, q0x, qy, q0z, q1x, qy, q1z);
+          col.push(inR, inG, inB, shade.r, shade.g, shade.b, inR, inG, inB);
+          col.push(inR, inG, inB, shade.r, shade.g, shade.b, shade.r, shade.g, shade.b);
+          px0 = q0x;
+          pz0 = q0z;
+          px1 = q1x;
+          pz1 = q1z;
+          py = qy;
+        }
       }
     }
     const g = new THREE.BufferGeometry();
@@ -1791,25 +1853,37 @@ export class World3D {
     this.shadowFrames = Math.max(this.shadowFrames, 1);
   }
 
-  updateMask() {
+  updateMask(force = false) {
+    // the mask only depends on which cells are land, so skip the canvas work while an intro is
+    // dropping tiles into a world whose beaches were already built up front
+    const sig = this.landTiles().size;
+    if (!force && sig === this.maskSig) {
+      this.maskDirty = false;
+      return;
+    }
+    this.maskSig = sig;
     this.buildShore();
     this.maskDirty = false;
     const S = MASK_SIZE;
     const toPx = (v) => (v / (MASK_EXTENT * 2) + 0.5) * S;
     const sctx = this.maskShape.getContext('2d');
-    sctx.clearRect(0, 0, S, S);
-    sctx.fillStyle = '#fff';
-    for (const k of this.tileObjs.keys()) {
-      const { x, z } = toWorld(k);
+    const hexPath = (x, z, r) => {
       sctx.beginPath();
       for (let i = 0; i < 6; i++) {
         const a = Math.PI / 2 + (i * Math.PI) / 3;
-        const px = toPx(x + Math.cos(a) * 1.0);
-        const pz = toPx(z + Math.sin(a) * 1.0);
+        const px = toPx(x + Math.cos(a) * r);
+        const pz = toPx(z + Math.sin(a) * r);
         if (i) sctx.lineTo(px, pz);
         else sctx.moveTo(px, pz);
       }
       sctx.closePath();
+    };
+    sctx.clearRect(0, 0, S, S);
+    sctx.globalCompositeOperation = 'source-over';
+    sctx.fillStyle = '#fff';
+    for (const k of this.landTiles().keys()) {
+      const { x, z } = toWorld(k);
+      hexPath(x, z, COAST_R);
       sctx.fill();
     }
     const ctx = this.maskCanvas.getContext('2d');
@@ -1819,7 +1893,7 @@ export class World3D {
     ctx.fillRect(0, 0, S, S);
     ctx.globalCompositeOperation = 'lighter';
     const tctx = this.maskTint.getContext('2d');
-    for (const [color, blur] of [['#ff0000', 5], ['#00ff00', 28]]) {
+    for (const [color, blur] of [['#ff0000', 2.5], ['#00ff00', 20]]) {
       tctx.globalCompositeOperation = 'source-over';
       tctx.clearRect(0, 0, S, S);
       tctx.drawImage(this.maskShape, 0, 0);
