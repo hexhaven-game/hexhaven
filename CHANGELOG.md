@@ -2,6 +2,12 @@
 
 All notable changes to Hexhaven. The game reads this file too: the version in the main menu opens it.
 
+## 0.3.1 — 24-09-2026
+
+### Improved
+- Haven orders explain themselves: the card shows how much you already have of each good, and tapping an order (or the ?) tells you what orders are, where to get the goods and what they pay.
+- Phones: the player scores sit in the status bar, so the top of the screen is two rows instead of three; tap the scores to see the full player list.
+
 ## 0.3 — 24-09-2026
 
 ### Improved

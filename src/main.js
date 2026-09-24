@@ -777,6 +777,13 @@ function renderPlayers() {
       </div>
     </div>`).join('');
 }
+// phones: the scores in the status bar open and close the player cards
+$('#status').addEventListener('click', (e) => {
+  if (!e.target.closest('.standings')) return;
+  document.body.classList.toggle('show-players');
+});
+// ...and touching the map puts them away again
+world.renderer.domElement.addEventListener('pointerdown', () => document.body.classList.remove('show-players'));
 // tap/click a player card to peek at their resources
 $('#players').addEventListener('click', (e) => {
   const c = e.target.closest('.pcard');
@@ -795,19 +802,23 @@ function renderStatus() {
   const pips = Array.from({ length: total }, (_, i) => `<i class="${i >= left ? 'used' : ''}"></i>`).join('');
   const placing = mode.kind === 'place' && mode.pid === me.id;
   const compact = innerWidth <= 760;
-  const sig = `${game.season}|${game.year}|${game.round}|${game.lastRound}|${left}|${me.freeExplore}|${total}|${placing}|${mode.kind}|${game.phase}|${compact}`;
+  const cur = current();
+  const standing = compact ? game.players.map((p) => `${p.prosp}${cur === p.id ? '*' : ''}`).join(',') : '';
+  const sig = `${game.season}|${game.year}|${game.round}|${game.lastRound}|${left}|${me.freeExplore}|${total}|${placing}|${mode.kind}|${game.phase}|${compact}|${standing}`;
   if (sig === statusSig) return;
   statusSig = sig;
   if (compact) {
-    // phones: just the essentials, icons over words
-    const cur = current();
+    // phones: one bar with round, your actions (or whose turn it is) and everyone's score;
+    // tapping the scores drops down the full player cards
     const who = cur != null && game.players[cur].isAI ? game.players[cur] : null;
     $('#status').innerHTML = `
       <span class="seg"><span class="sem">${S.icon}</span><b>${game.round}<span class="of">/${game.lastRound}</span></b></span>
       ${mode.kind === 'action' ? `<span class="seg"><span class="gpips">${pips}</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>` : ''}
       ${placing ? '<span class="seg lbl">Your tile</span>' : ''}
-      ${who ? `<span class="seg lbl"><span class="dot" style="--c:${hexColor(who.color)}"></span>${who.name}</span>` : ''}
-      ${game.phase === 'world' ? '<span class="seg lbl">Harvest</span>' : ''}`;
+      ${who ? `<span class="seg lbl">${who.name}</span>` : ''}
+      ${game.phase === 'world' ? '<span class="seg lbl">Harvest</span>' : ''}
+      <button class="standings" title="Players">${game.players.map((p) => `
+        <span class="mini ${cur === p.id ? 'active' : ''}" style="--c:${hexColor(p.color)}"><i>${p.name[0]}</i>${p.prosp}</span>`).join('')}</button>`;
     return;
   }
   $('#status').innerHTML = `
@@ -920,14 +931,45 @@ function renderScore() {
     cell.querySelector('small').textContent = inc[r] ? `+${inc[r]}` : '';
   }
   lastRes = { ...h.res };
-  // one small card: what Haven wants, what it pays; an order you can fill gets a Deliver button
-  el.querySelector('.orders').innerHTML = `<div class="oh">${svg('flag')} Haven orders</div>` + game.requests.map((q, i) => {
+  // one small card: what Haven wants, how far you are, what it pays. Tapping an order you can't
+  // fill yet explains how orders work; one you can fill is delivered straight away
+  el.querySelector('.orders').innerHTML = `<button class="oh" data-act="orders-help">${svg('flag')} Haven wants<span class="q">?</span></button>` + game.requests.map((q, i) => {
+    const have = Math.min(h.res[q.res], q.amount);
     const ok = canDeliver && h.res[q.res] >= q.amount;
-    return `<button class="order ${ok ? 'ready' : ''}" data-act="deliver" data-i="${i}" ${ok ? '' : 'disabled'}
-      title="Haven wants ${q.amount} ${q.res}, pays ${q.gold} gold and ${q.prosp} prosperity">
-      <span class="want">${amount({ [q.res]: q.amount })}</span><span class="arrow">→</span>
-      <span class="pay">${amount({ gold: q.gold })} <span class="pr">+${q.prosp}</span></span>${ok ? '<em>Deliver</em>' : ''}</button>`;
+    return `<button class="order ${ok ? 'ready' : ''}" data-act="${ok ? 'deliver' : 'orders-help'}" data-i="${i}"
+      title="Haven wants ${q.amount} ${RES_INFO[q.res].name.toLowerCase()}: you have ${h.res[q.res]}. Pays ${q.gold} gold and ${q.prosp} prosperity.">
+      <span class="want" style="--rc:${RES_COLOR[q.res]}">${svg(q.res)}<b>${have}</b><span class="of">/${q.amount}</span></span>
+      <span class="pay">${amount({ gold: q.gold })} <span class="pr">${svg('crown')}+${q.prosp}</span></span>${ok ? '<em>Deliver</em>' : ''}
+      <i class="prog"><i style="width:${(have / q.amount) * 100}%"></i></i></button>`;
   }).join('');
+}
+
+// where each good comes from, in words a new player can act on
+const RES_SOURCE = {
+  wood: 'Forest tiles give 1 each round; a lumber camp on a forest gives 2 more.',
+  stone: 'Mountain tiles give 1 each round; a quarry on a mountain gives 2 more.',
+  wool: 'Meadow tiles give 1 each round.',
+  grain: 'Sow wheat on a field; it is ready after 2 rounds.',
+  veg: 'Sow carrots or pumpkins on a field.',
+};
+function showOrdersHelp() {
+  const h = human();
+  openModal(`
+    <h2>Haven orders</h2>
+    <p class="note">Haven, the walled town in the middle, always wants two goods. Bring the full amount and it pays
+      more gold than the market does, plus prosperity (the score that wins the game). Delivering is free: it doesn't use an action.</p>
+    <div class="ohelp">${game.requests.map((q) => {
+      const ok = h.res[q.res] >= q.amount;
+      return `<div class="orow ${ok ? 'ok' : ''}">
+        <div class="ot" style="--rc:${RES_COLOR[q.res]}">${svg(q.res)}<b>${q.amount} ${RES_INFO[q.res].name.toLowerCase()}</b>
+          <span class="got">you have ${h.res[q.res]}</span>
+          <span class="rw">${amount({ gold: q.gold })} ${svg('crown')}+${q.prosp}</span></div>
+        <small>${ok ? 'Ready: tap Deliver in the orders card during your turn.' : `Short by ${q.amount - h.res[q.res]}. ${RES_SOURCE[q.res]} You can also trade for it.`}</small>
+      </div>`;
+    }).join('')}</div>
+    <p class="note">When an order is filled, Haven posts a new one. Whoever fills the most orders in a year wins the harvest fair (+10 prosperity, runner-up +5).</p>
+    <div class="actions"><button class="primary" data-close>Got it</button></div>`,
+  (card) => card.querySelector('[data-close]').onclick = closeModal);
 }
 
 function showEconomy() {
@@ -1215,6 +1257,7 @@ document.addEventListener('click', (e) => {
     case 'market': showMarket(); break;
     case 'economy': showEconomy(); break;
     case 'trade': showTrade(); break;
+    case 'orders-help': showOrdersHelp(); break;
     case 'deliver': if (mode.kind === 'action') { game.fulfillRequest(pid, Number(d.i)); render(); } break;
     case 'buy-tile': if (game.buyTile(pid)) toast('Extra tile', 'you place it next round', 1200); break;
     case 'end': endHumanTurn(); break;
