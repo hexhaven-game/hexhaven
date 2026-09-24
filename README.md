@@ -3,6 +3,10 @@
 A cozy hex-tile strategy game built with three.js: Dorfromantik-style tile placement, Catan-like
 trading and farming, light combat against bandits, and three AI opponents.
 
+## Play
+
+https://hexhaven-game.github.io/hexhaven/
+
 ## Run
 
 ```bash
