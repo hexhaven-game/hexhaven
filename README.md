@@ -60,9 +60,9 @@ before you place it.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # http://localhost:5180
 npm run build    # production build in dist/
-npm run preview  # serve the production build locally
+npm run preview  # serve the production build on http://localhost:5181
 ```
 
 ### Balance check
