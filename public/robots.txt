@@ -1,0 +1,25 @@
+# Hexhaven (https://hexhaven-game.github.io/hexhaven/)
+# Search engines may index the whole game.
+User-agent: *
+Allow: /
+
+# AI crawlers: explicitly allowed, so Hexhaven can show up in AI answers.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://hexhaven-game.github.io/hexhaven/sitemap.xml

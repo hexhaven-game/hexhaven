@@ -188,7 +188,7 @@ function showMainMenu() {
   const menu = $('#menu');
   menu.innerHTML = `
     <div class="menu-inner">
-      <h1 class="wordmark" aria-label="Hexhaven">${[...'hexhaven'].map((ch, i) => `<span style="--i:${i};--c:${WORD_COLORS[i % 4]}"><i>${ch}</i></span>`).join('')}</h1>
+      <div class="wordmark" aria-hidden="true">${[...'hexhaven'].map((ch, i) => `<span style="--i:${i};--c:${WORD_COLORS[i % 4]}"><i>${ch}</i></span>`).join('')}</div>
       <nav class="menu-nav">
         ${canContinue ? `<button data-m="continue">Continue<small>${saveMeta(auto)}</small></button>` : ''}
         <button data-m="new">New game</button>

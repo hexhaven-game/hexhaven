@@ -1,0 +1,24 @@
+# Hexhaven
+
+> Hexhaven is a free, single-player hex-tile strategy game that runs in the browser. You lay
+> hexagonal landscape tiles, farm crops, trade with rival towns and keep bandits away from your
+> haven, competing for the highest score against three AI opponents.
+
+## Key facts
+
+- Play: https://hexhaven-game.github.io/hexhaven/ (free, no install, desktop and mobile browsers)
+- Genre: cozy hex-tile strategy / city-building, in the spirit of Dorfromantik tile placement with light Catan-style trading
+- Modes: single player against three AI opponents
+- Tech: three.js (WebGL), Vite, vanilla JavaScript; no backend, saves in localStorage
+- Requirements: JavaScript and WebGL
+- Source code: https://github.com/hexhaven-game/hexhaven
+- Author: Jelle Siderius
+- Language: English
+
+## How it plays
+
+Each round you place hexagonal tiles from your hand to extend the landscape. Matching terrain
+neighbours score points, crops and buildings produce resources, and the market lets you trade
+resources with rival towns. Bandit camps must be cleared with light combat, and quests from the
+Haven pay gold for specific deliveries. The game ends after a fixed number of rounds and the
+player with the most valuable haven wins.

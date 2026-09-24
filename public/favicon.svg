@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Hexhaven">
+  <defs>
+    <linearGradient id="hex" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ad06f"/>
+      <stop offset="1" stop-color="#3d8b3f"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 3.5 56.1 17.8v28.4L32 60.5 7.9 46.2V17.8z" fill="url(#hex)" stroke="#2b6b33" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M32 19.5 45 27.4v16.2L32 48.5 19 43.6V27.4z" fill="#f7f4e6" opacity="0.92"/>
+  <path d="M32 19.5 45 27.4 32 35.3 19 27.4z" fill="#ffffff" opacity="0.9"/>
+</svg>

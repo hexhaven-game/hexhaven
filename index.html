@@ -3,15 +3,117 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hexhaven</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%234f9e38' d='M12 2l8.66 5v10L12 22l-8.66-5V7z'/></svg>" />
+    <title>Hexhaven – Cozy Hex-Tile Strategy Game for the Browser</title>
+    <meta
+      name="description"
+      content="Hexhaven is a free cozy hex-tile strategy game you play in the browser. Place hexagon tiles, farm crops, trade with rival towns and keep bandits away from your haven. Built with three.js."
+    />
+    <meta name="author" content="Jelle Siderius" />
+    <meta name="theme-color" content="#2f7d4f" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <link rel="canonical" href="https://hexhaven-game.github.io/hexhaven/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Hexhaven" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://hexhaven-game.github.io/hexhaven/" />
+    <meta property="og:title" content="Hexhaven – Cozy Hex-Tile Strategy Game for the Browser" />
+    <meta
+      property="og:description"
+      content="Lay hexagon tiles, farm crops, trade with rival towns and keep bandits away. A free single-player hex strategy game in your browser, built with three.js."
+    />
+    <meta property="og:image" content="https://hexhaven-game.github.io/hexhaven/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Hexhaven title screen with hexagon landscape tiles and the Hexhaven wordmark"
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Hexhaven – Cozy Hex-Tile Strategy Game" />
+    <meta
+      name="twitter:description"
+      content="A free hex-tile strategy game in your browser: place tiles, farm, trade and defend your haven against bandits."
+    />
+    <meta name="twitter:image" content="https://hexhaven-game.github.io/hexhaven/og-image.png" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/style.css" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "VideoGame",
+            "@id": "https://hexhaven-game.github.io/hexhaven/#game",
+            "name": "Hexhaven",
+            "alternateName": "Hexhaven hex-tile strategy game",
+            "description": "Hexhaven is a cozy hex-tile strategy game for the browser. Place hexagonal landscape tiles, farm crops, trade with rival towns and defend your haven against bandits, with three AI opponents to compete against.",
+            "url": "https://hexhaven-game.github.io/hexhaven/",
+            "image": "https://hexhaven-game.github.io/hexhaven/og-image.png",
+            "screenshot": "https://hexhaven-game.github.io/hexhaven/og-image.png",
+            "genre": ["Strategy", "Puzzle", "City-building"],
+            "gamePlatform": ["Web browser"],
+            "playMode": ["SinglePlayer"],
+            "applicationCategory": "Game",
+            "operatingSystem": "Any modern web browser",
+            "browserRequirements": "Requires JavaScript and WebGL",
+            "inLanguage": "en",
+            "isAccessibleForFree": true,
+            "codeRepository": "https://github.com/hexhaven-game/hexhaven",
+            "author": {
+              "@type": "Person",
+              "name": "Jelle Siderius",
+              "url": "https://github.com/jellesiderius"
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": "HexHaven",
+              "url": "https://github.com/hexhaven-game"
+            },
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "EUR",
+              "availability": "https://schema.org/InStock"
+            }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://hexhaven-game.github.io/hexhaven/#website",
+            "name": "Hexhaven",
+            "url": "https://hexhaven-game.github.io/hexhaven/",
+            "inLanguage": "en",
+            "about": { "@id": "https://hexhaven-game.github.io/hexhaven/#game" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body class="in-menu">
     <div id="scene"></div>
+    <header id="intro">
+      <h1>Hexhaven</h1>
+      <p class="intro-lead">
+        A cozy hex-tile strategy game you play in the browser: lay hexagonal landscape tiles, farm
+        crops, trade with rival towns and keep bandits away from your haven.
+      </p>
+      <p class="intro-meta">Free &middot; No install &middot; Single player vs three AI towns &middot; Built with three.js</p>
+      <noscript>
+        <p class="intro-meta">
+          Hexhaven needs JavaScript and WebGL to run. Source code and screenshots live on
+          <a href="https://github.com/hexhaven-game/hexhaven">GitHub</a>.
+        </p>
+      </noscript>
+    </header>
     <div id="hud">
       <div id="tl">
         <button id="menuBtn" class="hexicon-btn" title="Menu (Esc)"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16v2H4zM4 11h16v2H4zM4 15h16v2H4z" /></svg></button>
