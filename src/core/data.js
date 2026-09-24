@@ -55,10 +55,10 @@ export const GUARD_COST = { grain: 2, gold: 2 };
 export const MAX_GUARDS = 5;
 
 export const SEASONS = [
-  { name: 'Spring', icon: '🌸', desc: 'Crops grow.' },
-  { name: 'Summer', icon: '☀️', desc: 'Crops grow. Wool sells well.' },
-  { name: 'Autumn', icon: '🍂', desc: 'Every harvest gives +1.' },
-  { name: 'Winter', icon: '❄️', desc: 'Nothing grows. Build and trade.' },
+  { name: 'Spring', icon: 'spring', desc: 'Crops grow.' },
+  { name: 'Summer', icon: 'summer', desc: 'Crops grow. Wool sells well.' },
+  { name: 'Autumn', icon: 'autumn', desc: 'Every harvest gives +1.' },
+  { name: 'Winter', icon: 'winter', desc: 'Nothing grows. Build and trade.' },
 ];
 export const ROUNDS_PER_SEASON = 3;
 export const TOTAL_ROUNDS = 24;

@@ -68,7 +68,7 @@ npm run preview  # serve the production build on http://localhost:5181
 ### Balance check
 
 `tools/sim.mjs` plays AI-only games and reports pacing, scoring and upgrade impact — handy after
-tuning numbers in `src/data.js`:
+tuning numbers in `src/core/data.js`:
 
 ```bash
 node tools/sim.mjs 40   # 40 simulated games
@@ -76,18 +76,36 @@ node tools/sim.mjs 40   # 40 simulated games
 
 ## Project layout
 
+The code is split in three layers. `core/` knows nothing about the browser, so the simulator can
+run it headless; `render/` draws the state; `ui/` is everything made of HTML.
+
 | Path | Contents |
 | --- | --- |
-| `src/game.js` | rules, economy, quests, save/load |
-| `src/ai.js` | opponent decisions and trading |
-| `src/world3d.js` | rendering: baked tiles, toon shading, water, particles, camera |
-| `src/shaders.js` | water, landing marker, weather and final grade shaders |
-| `src/main.js` | game loop, HUD, menus |
-| `src/data.js` | tiles, buildings, crops, perks and tuning values |
-| `src/icons.js` | inline SVG icon set |
+| `src/main.js` | entry point: game loop, turn flow, input, HUD rendering, menus |
+| `src/core/data.js` | tiles, buildings, crops, perks and tuning values |
+| `src/core/game.js` | game state, setup, save/load and the round flow |
+| `src/core/systems/` | the rules, one file per part: `economy`, `placement`, `actions`, `quests`, `combat` |
+| `src/core/ai.js` | opponent decisions and trading |
+| `src/core/hex.js` | hex grid maths |
+| `src/render/world3d.js` | the 3D world: tiles, sea and coast, camera, picking, frame loop |
+| `src/render/builders.js` | procedural tile dioramas (one builder per terrain) |
+| `src/render/materials.js` | shared toon material, season/sway shader patch, geometry cache |
+| `src/render/sprites.js` | canvas textures: labels, badges, floating harvest text |
+| `src/render/effects.js` | particles and bloom |
+| `src/render/shaders.js` | water, landing marker, weather and final grade shaders |
+| `src/ui/app.js` | the shared `game` and `world`, plus hooks back into the loop |
+| `src/ui/dom.js` | DOM helpers: toast, modal, amounts |
+| `src/ui/storage.js` | settings and save slots |
+| `src/ui/changelog.js` | the in-game changelog |
+| `src/ui/dialogs/` | one file per dialog: market, trade, economy, orders, help, settings |
+| `src/ui/icons.js` | inline SVG icon set and icon colours |
 | `src/style.css` | HUD and menu styling |
 | `tools/sim.mjs` | headless AI balance simulator |
 | `public/` | static files served as-is: `robots.txt`, `sitemap.xml`, `llms.txt`, icons |
+
+Adding a rule usually means adding values to `core/data.js` and a method to the matching file in
+`core/systems/` (methods there are mixed into `Game`, so they are called as `game.method()`).
+A new dialog is a new file in `ui/dialogs/` that uses `openModal` from `ui/dom.js`.
 
 ## Changelog
 

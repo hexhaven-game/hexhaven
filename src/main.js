@@ -1,74 +1,21 @@
-import { Game } from './game.js';
-import { World3D } from './world3d.js';
-import { choosePlacement, aiStep, respondToOffer, proposeTrade } from './ai.js';
+import { choosePlacement, aiStep, proposeTrade } from './core/ai.js';
 import {
-  RES, TRADE_RES, RES_INFO, TILE_TYPES, BUILDINGS, CROPS, HOME_LEVELS, POIS, GUARD_COST, MAX_GUARDS,
+  RES, RES_INFO, TILE_TYPES, BUILDINGS, CROPS, HOME_LEVELS, POIS, GUARD_COST, MAX_GUARDS,
   SEASONS, BONUSES, WIN_GOAL, BUILDING_UPGRADES, PERKS, PLACEABLE,
-} from './data.js';
-import { svg, iconify } from './icons.js';
-import changelogMd from '../CHANGELOG.md?raw';
+} from './core/data.js';
+import { svg, iconify } from './ui/icons.js';
+import { game, world, human, hooks } from './ui/app.js';
+import { $, hexColor, amount, RES_COLOR, toast, openModal, closeModal, modalOpen } from './ui/dom.js';
+import { settings, readJSON, writeJSON, readSave, writeSave, deleteSave, saveMeta, sleep } from './ui/storage.js';
+import { APP_VERSION, showChangelog } from './ui/changelog.js';
+import { showMarket } from './ui/dialogs/market.js';
+import { showTrade, aiOfferModal } from './ui/dialogs/trade.js';
+import { showEconomy } from './ui/dialogs/economy.js';
+import { showOrdersHelp } from './ui/dialogs/orders.js';
+import { showHelp } from './ui/dialogs/help.js';
+import { showSettings } from './ui/dialogs/settings.js';
 
 // ---------- changelog (the same CHANGELOG.md that lives in the repo root) ----------
-function parseChangelog(md) {
-  const releases = [];
-  let rel = null;
-  let sec = null;
-  for (const raw of md.split('\n')) {
-    const line = raw.trim();
-    const v = line.match(/^##\s+([\d.]+)\s*[—-]\s*(.+)$/);
-    if (v) {
-      rel = { version: v[1], date: v[2].trim(), sections: [] };
-      releases.push(rel);
-      sec = null;
-      continue;
-    }
-    const h = line.match(/^###\s+(.+)$/);
-    if (h && rel) {
-      sec = { title: h[1].trim(), items: [] };
-      rel.sections.push(sec);
-      continue;
-    }
-    const item = line.match(/^[-*]\s+(.+)$/);
-    if (item && sec) sec.items.push(item[1]);
-  }
-  return releases;
-}
-const RELEASES = parseChangelog(changelogMd);
-const APP_VERSION = RELEASES[0]?.version ?? '0';
-
-const $ = (s) => document.querySelector(s);
-const hexColor = (c) => `#${c.toString(16).padStart(6, '0')}`;
-const amount = (obj) => Object.entries(obj).filter(([, n]) => n > 0)
-  .map(([r, n]) => `<span class="amt">${n}${svg(r)}</span>`).join(' ') || 'free';
-
-// ---------- settings & saves ----------
-const SETTINGS_KEY = 'hexhaven-settings';
-const settings = { quality: 'high', speed: 1, follow: true, ...readJSON(SETTINGS_KEY) };
-const saveKey = (slot) => `hexhaven-save-${slot}`;
-
-function readJSON(k, store = localStorage) {
-  try { return JSON.parse(store.getItem(k)) || null; } catch { return null; }
-}
-function writeJSON(k, v, store = localStorage) {
-  try { store.setItem(k, JSON.stringify(v)); return true; } catch { return false; }
-}
-const readSave = (slot) => readJSON(saveKey(slot));
-const writeSave = (slot) => writeJSON(saveKey(slot), game.serialize());
-function deleteSave(slot) {
-  try { localStorage.removeItem(saveKey(slot)); } catch { /* storage unavailable */ }
-}
-
-function saveMeta(d) {
-  if (!d) return null;
-  const r = Math.max(1, d.round);
-  const season = SEASONS[Math.floor((r - 1) / 3) % 4];
-  const year = Math.floor((r - 1) / 12) + 1;
-  const ago = Math.round((Date.now() - d.savedAt) / 60000);
-  const when = ago < 1 ? 'just now' : ago < 60 ? `${ago} min ago` : new Date(d.savedAt).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  return `Year ${year}, ${season.name.toLowerCase()} · ${when}`;
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms * settings.speed));
 
 // Menu flies out, the world morphs (see World3D.transitionTo), then the HUD fades in and play starts
 function enterGame() {
@@ -88,8 +35,6 @@ function enterGame() {
 }
 
 // ---------- core objects ----------
-const game = new Game();
-const world = new World3D($('#scene'), game);
 world.setQuality(settings.quality);
 window.hexhaven = { game, world, settings };
 
@@ -130,7 +75,6 @@ game.on('float', (k, text) => {
   if (!muted) world.floatText(k, text);
 });
 
-const human = () => game.players.find((p) => !p.isAI);
 
 // ---------- log / toast / modal ----------
 // Log lines are batched per frame and only the newest three are kept, so a big harvest
@@ -152,35 +96,6 @@ function addLog(msg, pid) {
     while (log.children.length > 3) log.lastChild.remove();
   });
 }
-
-function toast(title, sub = '', ms = 2000) {
-  const el = $('#toast');
-  el.innerHTML = `<div class="t">${title}</div>${sub ? `<div class="s">${sub}</div>` : ''}`;
-  el.classList.remove('show');
-  void el.offsetWidth;
-  el.classList.add('show');
-  return new Promise((res) => setTimeout(() => { el.classList.remove('show'); setTimeout(res, 250); }, ms * settings.speed));
-}
-
-let modalClose = null;
-function openModal(html, bind, { onClose, wide, noDim } = {}) {
-  const m = $('#modal');
-  const card = m.querySelector('.card');
-  card.innerHTML = html;
-  card.classList.toggle('wide', !!wide);
-  m.classList.toggle('nodim', !!noDim);
-  m.classList.remove('hidden');
-  modalClose = onClose || null;
-  bind?.(card);
-  $('#tooltip').style.display = 'none';
-}
-function closeModal() {
-  $('#modal').classList.add('hidden');
-  const fn = modalClose;
-  modalClose = null;
-  fn?.();
-}
-const modalOpen = () => !$('#modal').classList.contains('hidden');
 
 // ---------- main menu ----------
 function buildDemoWorld() {
@@ -243,11 +158,6 @@ function showMainMenu() {
   };
 }
 
-function hideMainMenu() {
-  $('#menu').classList.add('hidden');
-  document.body.classList.remove('in-menu');
-  world.setMenuMode(false);
-}
 
 function showNewGame() {
   let bonus = 'farmer';
@@ -343,72 +253,6 @@ function showSlots(kind) {
       if (t.dataset.del) { deleteSave(t.dataset.del); draw(card); }
     };
   });
-}
-
-function showSettings() {
-  const opt = (key, val, label) => `<button class="seg ${settings[key] === val ? 'on' : ''}" data-k="${key}" data-v="${val}">${label}</button>`;
-  openModal(`
-    <h2>Settings</h2>
-    <div class="setting"><span>Graphics</span><div class="segs">${opt('quality', 'high', 'Pretty')}${opt('quality', 'low', 'Fast')}</div></div>
-    <div class="setting"><span>Opponent speed</span><div class="segs">${opt('speed', 1, 'Relaxed')}${opt('speed', 0.45, 'Brisk')}</div></div>
-    <div class="setting"><span>Follow opponents with the camera</span><div class="segs">${opt('follow', true, 'On')}${opt('follow', false, 'Off')}</div></div>
-    <div class="actions"><button class="primary" data-x="close">Done</button></div>`, (card) => {
-    card.onclick = (e) => {
-      const b = e.target.closest('button');
-      if (!b) return;
-      if (b.dataset.x) return closeModal();
-      const raw = b.dataset.v;
-      const v = b.dataset.k === 'speed' ? Number(raw) : b.dataset.k === 'follow' ? raw === 'true' : raw;
-      settings[b.dataset.k] = v;
-      if (b.dataset.k === 'quality') world.setQuality(v);
-      writeJSON(SETTINGS_KEY, settings);
-      showSettings();
-    };
-  });
-}
-
-function showHelp() {
-  openModal(`
-    <h2>How to play</h2>
-    <ol class="rules">
-      <li>Each round, pick one of three tiles and place it against your own land. Matching neighbours earn extra prosperity.</li>
-      <li>Then spend your actions: plant, build, scout, hire a guard or attack a bandit camp.</li>
-      <li>Trading and the Haven market are free. Haven always has two open orders.</li>
-      <li>Some tiles come with a goal flag: grow that area to the number shown for prosperity and a bonus tile.</li>
-      <li>A lake next to a field makes crops grow a round faster. Nothing grows in winter.</li>
-      <li>Grow your farm into a homestead, manor, village and finally a town for more actions and income.</li>
-      <li>Buildings can be improved once for a little extra, and your farm's workshop unlocks small personal perks as it grows.</li>
-      <li>At the end of each year the harvest fair rewards whoever filled the most orders.</li>
-      <li>Spare gold buys extra tiles, one per round, a little pricier each time.</li>
-      <li>First to ${WIN_GOAL} prosperity wins. Otherwise the leader after two years wins. Gold only breaks ties.</li>
-    </ol>
-    <p class="note">Keys: 1 2 3 pick a tile · E end turn · M market · T trade · I economy · Esc menu</p>
-    <div class="actions"><button class="primary" data-x="close">Got it</button></div>`, (card) => {
-    card.querySelector('[data-x]').onclick = closeModal;
-  });
-}
-
-function showChangelog() {
-  const esc = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-  // dates are written Dutch-style (dd-mm-yyyy) in CHANGELOG.md and shown as-is
-  const fmtDate = (d) => d;
-  const kind = (title) => ({ new: 'new', improved: 'improved', fixed: 'fixed', fix: 'fixed' }[title.toLowerCase()] || 'other');
-  const release = (r) => `
-    <div class="rel-head"><b>Version ${r.version}</b><span>${fmtDate(r.date)}</span></div>
-    ${r.sections.map((sec) => `
-      <div class="rel-sec">
-        <span class="rel-tag ${kind(sec.title)}">${esc(sec.title)}</span>
-        <ul>${sec.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
-      </div>`).join('')}`;
-  openModal(`
-    <h2>What's new</h2>
-    <div class="changelog">
-      ${RELEASES.length ? release(RELEASES[0]) : '<p class="note">No changes recorded yet.</p>'}
-      ${RELEASES.slice(1).map((r) => `<details class="rel-old"><summary><i class="chev" aria-hidden="true"></i>Version ${r.version} <span>${fmtDate(r.date)}</span></summary>${release(r)}</details>`).join('')}
-    </div>
-    <div class="actions"><button class="primary" data-x="close">Close</button></div>`, (card) => {
-    card.querySelector('[data-x]').onclick = closeModal;
-  }, { wide: true });
 }
 
 function showPause() {
@@ -758,7 +602,6 @@ function render() {
 }
 
 // resources shown on the small player cards on the left
-const CARD_RES = ['gold', 'wood', 'wool'];
 
 let openCard = null;
 function renderPlayers() {
@@ -808,21 +651,18 @@ function renderStatus() {
   if (sig === statusSig) return;
   statusSig = sig;
   if (compact) {
-    // phones: one bar with round, your actions (or whose turn it is) and everyone's score;
-    // tapping the scores drops down the full player cards
-    const who = cur != null && game.players[cur].isAI ? game.players[cur] : null;
+    // phones: one bar with round, your actions and everyone's score (whose turn it is shows at
+    // the bottom); tapping the scores drops down the full player cards
     $('#status').innerHTML = `
-      <span class="seg"><span class="sem">${S.icon}</span><b>${game.round}<span class="of">/${game.lastRound}</span></b></span>
+      <span class="seg"><span class="sem">${svg(S.icon)}</span><b>${game.round}<span class="of">/${game.lastRound}</span></b></span>
       ${mode.kind === 'action' ? `<span class="seg"><span class="gpips">${pips}</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>` : ''}
-      ${placing ? '<span class="seg lbl">Your tile</span>' : ''}
-      ${who ? `<span class="seg lbl">${who.name}</span>` : ''}
-      ${game.phase === 'world' ? '<span class="seg lbl">Harvest</span>' : ''}
+
       <button class="standings" title="Players">${game.players.map((p) => `
         <span class="mini ${cur === p.id ? 'active' : ''}" style="--c:${hexColor(p.color)}"><i>${p.name[0]}</i>${p.prosp}</span>`).join('')}</button>`;
     return;
   }
   $('#status').innerHTML = `
-    <span class="seg"><span class="sem">${S.icon}</span><b>${S.name}</b><span class="lbl">Year ${game.year}</span></span>
+    <span class="seg"><span class="sem">${svg(S.icon)}</span><b>${S.name}</b><span class="lbl">Year ${game.year}</span></span>
     <i class="vdiv"></i>
     <span class="seg lbl">Round ${game.round}<span class="of">/${game.lastRound}</span></span>
     <i class="vdiv"></i>
@@ -871,6 +711,8 @@ function renderGoal() {
     const el = $('#goal');
     el.innerHTML = html;
     el.classList.toggle('hidden', !html);
+    // opponents and the harvest have nothing in hand, so on phones their line sits at the very bottom
+    el.classList.toggle('low', sig.startsWith('ai|') || sig === 'world');
     el.classList.remove('pop');
     void el.offsetWidth;
     el.classList.add('pop');
@@ -893,7 +735,6 @@ function renderGoal() {
   }
 }
 
-const RES_COLOR = { wood: '#9a6a40', stone: '#7f8a87', grain: '#d69e1c', veg: '#e0702a', wool: '#9c86c2', gold: '#d9a514' };
 let lastRes = null;
 
 function renderScore() {
@@ -942,88 +783,6 @@ function renderScore() {
       <span class="pay">${amount({ gold: q.gold })} <span class="pr">${svg('crown')}+${q.prosp}</span></span>${ok ? '<em>Deliver</em>' : ''}
       <i class="prog"><i style="width:${(have / q.amount) * 100}%"></i></i></button>`;
   }).join('');
-}
-
-// where each good comes from, in words a new player can act on
-const RES_SOURCE = {
-  wood: 'Forest tiles give 1 each round; a lumber camp on a forest gives 2 more.',
-  stone: 'Mountain tiles give 1 each round; a quarry on a mountain gives 2 more.',
-  wool: 'Meadow tiles give 1 each round.',
-  grain: 'Sow wheat on a field; it is ready after 2 rounds.',
-  veg: 'Sow carrots or pumpkins on a field.',
-};
-function showOrdersHelp() {
-  const h = human();
-  openModal(`
-    <h2>Haven orders</h2>
-    <p class="note">Haven, the walled town in the middle, always wants two goods. Bring the full amount and it pays
-      more gold than the market does, plus prosperity (the score that wins the game). Delivering is free: it doesn't use an action.</p>
-    <div class="ohelp">${game.requests.map((q) => {
-      const ok = h.res[q.res] >= q.amount;
-      return `<div class="orow ${ok ? 'ok' : ''}">
-        <div class="ot" style="--rc:${RES_COLOR[q.res]}">${svg(q.res)}<b>${q.amount} ${RES_INFO[q.res].name.toLowerCase()}</b>
-          <span class="got">you have ${h.res[q.res]}</span>
-          <span class="rw">${amount({ gold: q.gold })} ${svg('crown')}+${q.prosp}</span></div>
-        <small>${ok ? 'Ready: tap Deliver in the orders card during your turn.' : `Short by ${q.amount - h.res[q.res]}. ${RES_SOURCE[q.res]} You can also trade for it.`}</small>
-      </div>`;
-    }).join('')}</div>
-    <p class="note">When an order is filled, Haven posts a new one. Whoever fills the most orders in a year wins the harvest fair (+10 prosperity, runner-up +5).</p>
-    <div class="actions"><button class="primary" data-close>Got it</button></div>`,
-  (card) => card.querySelector('[data-close]').onclick = closeModal);
-}
-
-function showEconomy() {
-  const h = human();
-  const eco = game.economy(h.id);
-  const soon = {};
-  for (const c of eco.crops) {
-    if (c.left <= 3) for (const [r, n] of Object.entries(c.yield)) soon[r] = (soon[r] || 0) + n;
-  }
-  const hist = eco.history;
-  const maxW = Math.max(10, ...hist.map((x) => x.worth));
-  // fixed-size bars (12 slots) so a short history doesn't stretch into blobs
-  const bars = hist.length
-    ? `<svg class="chart" viewBox="0 0 264 84">${hist.map((x, i) => {
-      const bh = Math.max(3, (x.worth / maxW) * 54);
-      return `<g><rect x="${i * 22 + 3}" y="${70 - bh}" width="16" height="${bh}" rx="3"><title>Round ${x.round}: worth ${x.worth} gold</title></rect>
-        <text x="${i * 22 + 11}" y="${64 - bh}" text-anchor="middle">${Math.round(x.worth)}</text>
-        <text x="${i * 22 + 11}" y="82" text-anchor="middle" class="r">${x.round}</text></g>`;
-    }).join('')}</svg>`
-    : '<p class="note">Your income appears here after the first harvest.</p>';
-  const trend = hist.length >= 2 ? hist[hist.length - 1].worth - hist[hist.length - 2].worth : 0;
-  const perRound = RES.reduce((s, r) => s + (eco.income[r] || 0) * (r === 'gold' ? 1 : game.market[r].p), 0);
-  openModal(`
-    <h2>Your economy</h2>
-    <div class="eco-top">
-      <div><small>stock is worth</small><b>${Math.round(eco.value)}</b>${svg('gold')}</div>
-      <div><small>income per round</small><b>${Math.round(perRound)}</b>${svg('gold')}</div>
-      <div><small>vs previous round</small><b class="${trend >= 0 ? 'good' : 'bad'}">${trend >= 0 ? '+' : '−'}${Math.abs(Math.round(trend))}</b></div>
-    </div>
-    <table class="eco">
-      <tr><th></th><th>have</th><th>each round</th><th>from crops soon</th><th>sells for</th></tr>
-      ${RES.map((r) => `<tr>
-        <td><span class="ico" style="--rc:${RES_COLOR[r]}">${svg(r)}</span>${RES_INFO[r].name}</td>
-        <td><b>${h.res[r]}</b></td>
-        <td class="${eco.income[r] ? 'good' : 'dim'}">${eco.income[r] ? `+${eco.income[r]}` : '–'}</td>
-        <td class="${soon[r] ? '' : 'dim'}">${soon[r] ? `+${soon[r]}` : '–'}</td>
-        <td class="dim">${r === 'gold' ? '' : game.sellPrice(h.id, r)}</td></tr>`).join('')}
-    </table>
-    <div class="eco-cols">
-      <div>
-        <h4>Where it comes from</h4>
-        ${eco.sources.length ? eco.sources.map((src) => `<div class="src"><span>${src.n > 1 ? `${src.n}× ` : ''}${src.label}</span><span>${amount(src.gives)}</span></div>`).join('') : '<p class="note">Nothing yet. Forests, meadows and mountains produce every round.</p>'}
-      </div>
-      <div>
-        <h4>In the ground</h4>
-        ${eco.crops.length ? eco.crops.map((c) => `<div class="src"><span>${c.name}</span><span>${c.left ? `${c.left} round${c.left > 1 ? 's' : ''}` : 'this round'} → ${amount(c.yield)}</span></div>`).join('') : '<p class="note">No crops planted. Click a field to plant.</p>'}
-        <h4>Income per round</h4>
-        ${bars}
-        ${eco.bandits ? `<p class="note warn">${eco.bandits} bandit camp${eco.bandits > 1 ? 's' : ''} next to your land. Your guards stop ${Math.round(eco.block * 100)}% of raids.</p>` : ''}
-      </div>
-    </div>
-    <div class="actions"><button class="primary" data-x="close">Close</button></div>`, (card) => {
-    card.querySelector('[data-x]').onclick = closeModal;
-  }, { wide: true });
 }
 
 let handSig = '';
@@ -1289,133 +1048,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ---------- market ----------
-function showMarket() {
-  const pid = human().id;
-  const draw = (card) => {
-    const p = human();
-    const conn = game.connected(pid);
-    card.innerHTML = `
-      <h2>Haven market</h2>
-      <p class="note">${conn ? 'Your land borders Haven, so you get the full price.' : 'Your land doesn’t reach Haven yet: selling costs 1 gold transport each.'}</p>
-      <table class="market">
-        <tr><th></th><th>you have</th><th>sell</th><th>buy</th><th></th></tr>
-        ${TRADE_RES.map((r) => `<tr>
-            <td>${svg(r)} ${RES_INFO[r].name}</td>
-            <td>${p.res[r]}</td>
-            <td>${game.sellPrice(pid, r)}</td>
-            <td>${game.buyPrice(r, pid)}</td>
-            <td class="btncell">
-              <button class="small" data-sell="${r}" ${p.res[r] ? '' : 'disabled'}>Sell</button>
-              <button class="small ghost" data-sellall="${r}" ${p.res[r] > 1 ? '' : 'disabled'}>All</button>
-              <button class="small" data-buy="${r}" ${p.res.gold >= game.buyPrice(r, pid) ? '' : 'disabled'}>Buy</button>
-            </td></tr>`).join('')}
-      </table>
-      <p class="note">You have ${amount({ gold: p.res.gold })}. Prices drop when a lot is sold and recover each round.</p>
-      <div class="actions"><button class="primary" data-x="close">Close</button></div>`;
-  };
-  openModal('', (card) => {
-    draw(card);
-    card.onclick = (e) => {
-      const b = e.target.closest('button');
-      if (!b) return;
-      if (b.dataset.x) return closeModal();
-      if (b.dataset.sell) game.sell(pid, b.dataset.sell, 1);
-      if (b.dataset.sellall) game.sell(pid, b.dataset.sellall, human().res[b.dataset.sellall]);
-      if (b.dataset.buy) game.buy(pid, b.dataset.buy, 1);
-      draw(card);
-    };
-  }, { wide: true, onClose: () => { refreshHighlights(); render(); } });
-}
 
 // ---------- trading ----------
-function showTrade() {
-  const h = human();
-  const give = {};
-  const want = {};
-  let responses = null;
-  const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, n]) => n > 0));
-  const stepper = (side, r) => {
-    const obj = side === 'give' ? give : want;
-    const max = side === 'give' ? h.res[r] : 9;
-    return `<div class="line"><span>${svg(r)} ${RES_INFO[r].name}${side === 'give' ? ` <small>${h.res[r]}</small>` : ''}</span>
-      <span class="stepper"><button class="small ghost" data-s="${side}" data-r="${r}" data-d="-1" ${obj[r] ? '' : 'disabled'}>−</button>
-      <b>${obj[r] || 0}</b>
-      <button class="small ghost" data-s="${side}" data-r="${r}" data-d="1" ${(obj[r] || 0) < max ? '' : 'disabled'}>+</button></span></div>`;
-  };
-  const draw = (card) => {
-    const g = clean(give);
-    const w = clean(want);
-    const valid = Object.keys(g).length && Object.keys(w).length;
-    card.innerHTML = `
-      <h2>Trade</h2>
-      <div class="trade-grid">
-        <div><h4>You give</h4>${RES.map((r) => stepper('give', r)).join('')}</div>
-        <div><h4>You ask for</h4>${RES.map((r) => stepper('want', r)).join('')}</div>
-      </div>
-      <div class="actions">
-        <button class="ghost" data-x="close">Close</button>
-        <button class="primary" data-x="offer" ${valid ? '' : 'disabled'}>Make offer</button>
-      </div>
-      ${responses ? `<div class="responses">${responses.map((r, i) => {
-        const ai = game.players[r.pid];
-        const action = r.kind === 'accept'
-          ? `<button class="primary small" data-accept="${i}">Trade</button>`
-          : r.kind === 'counter'
-            ? `<span class="counter">${amount(r.gives)} for ${amount(r.wants)}</span><button class="primary small" data-accept="${i}" ${game.canAfford(h, r.gives) ? '' : 'disabled'}>Accept</button>`
-            : '<span class="no">no</span>';
-        return `<div class="resp" style="--c:${hexColor(ai.color)}"><div><b>${ai.name}</b><span class="q">${r.text}</span></div><div class="ra">${action}</div></div>`;
-      }).join('')}</div>` : ''}`;
-  };
-  openModal('', (card) => {
-    draw(card);
-    card.onclick = (e) => {
-      const b = e.target.closest('button');
-      if (!b || b.disabled) return;
-      if (b.dataset.x === 'close') return closeModal();
-      if (b.dataset.s) {
-        const obj = b.dataset.s === 'give' ? give : want;
-        obj[b.dataset.r] = Math.max(0, (obj[b.dataset.r] || 0) + Number(b.dataset.d));
-        responses = null;
-      }
-      if (b.dataset.x === 'offer') {
-        responses = game.players.filter((p) => p.isAI).map((ai) => ({ pid: ai.id, ...respondToOffer(game, ai, h, clean(give), clean(want)) }));
-      }
-      if (b.dataset.accept != null) {
-        const r = responses[Number(b.dataset.accept)];
-        if (game.trade(h.id, r.pid, r.gives, r.wants)) {
-          closeModal();
-          toast('Traded', `with ${game.players[r.pid].name}`, 1300);
-          return;
-        }
-      }
-      draw(card);
-    };
-  }, { wide: true, onClose: () => { refreshHighlights(); render(); } });
-}
-
-function aiOfferModal(ai, prop) {
-  return new Promise((resolve) => {
-    openModal(`
-      <h2><span class="dot" style="--c:${hexColor(ai.color)}"></span>${ai.name} wants to trade</h2>
-      <div class="offer-box">
-        <div><small>you get</small><b>${amount(prop.aiGives)}</b></div>
-        <div class="arrow">${svg('trade')}</div>
-        <div><small>you give</small><b>${amount(prop.aiWants)}</b></div>
-      </div>
-      <div class="actions">
-        <button class="ghost" data-r="0">No thanks</button>
-        <button class="primary" data-r="1">Trade</button>
-      </div>`, (card) => {
-      card.onclick = (e) => {
-        const b = e.target.closest('[data-r]');
-        if (!b) return;
-        modalClose = null;
-        closeModal();
-        resolve(b.dataset.r === '1');
-      };
-    }, { onClose: () => resolve(false), noDim: true });
-  });
-}
 
 // ---------- end ----------
 function showEnd() {
@@ -1442,6 +1076,9 @@ function showEnd() {
     };
   });
 }
+
+// dialogs call back into the loop through these
+Object.assign(hooks, { render, refreshHighlights, doAction });
 
 // ---------- boot ----------
 async function boot() {

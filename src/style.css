@@ -914,3 +914,40 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 .orow .rw { margin-left: auto; display: flex; align-items: center; gap: 4px; font-weight: 700; }
 .orow .rw .ic { color: #d9a514; }
 .orow small { display: block; margin-top: 4px; color: var(--ink-2); line-height: 1.4; }
+
+/* shared icon tints: every resource/season icon has one colour everywhere */
+:where(.ic.i-wood) { color: #9a6a40; }
+:where(.ic.i-stone) { color: #7f8a87; }
+:where(.ic.i-grain) { color: #d69e1c; }
+:where(.ic.i-veg) { color: #e0702a; }
+:where(.ic.i-wool) { color: #9c86c2; }
+:where(.ic.i-gold) { color: #d9a514; }
+:where(.ic.i-crown) { color: #d9a514; }
+:where(.ic.i-spring) { color: #f07aa8; }
+:where(.ic.i-summer) { color: #f0b02c; }
+:where(.ic.i-autumn) { color: #e0702a; }
+:where(.ic.i-winter) { color: #8fc8e8; }
+#status .sem .ic { width: 17px; height: 17px; display: block; }
+
+/* phones: the turn banner is one small line. On your turn it only says what to do next (above
+   the tile tray); on an opponent's turn or the harvest it sits at the bottom instead of the tray */
+@media (max-width: 760px) {
+  #goal {
+    left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 20px);
+    padding: 7px 14px; gap: 2px; border-radius: 16px; align-items: center; text-align: center;
+  }
+  #goal .goal-head:not(.ai), #goal .goal-sub { display: none; }
+  #goal .goal-head.ai { font-size: 13.5px; gap: 6px; }
+  #goal .steps { gap: 0; }
+  #goal .step:not(.now) { display: none; }
+  #goal .step.now { font-size: 13px; color: var(--parch-ink); }
+  #goal .step.now i { display: none; }
+  #goal .goal-hint.show { height: 16px; font-size: 12px; }
+  #goal.low { bottom: calc(env(safe-area-inset-bottom) + 14px); }
+  #goal.pop { animation: none; }
+  .waiting { display: none; }
+}
+/* the harvest has no step list, so on phones its heading is the line */
+@media (max-width: 760px) {
+  #goal.low .goal-head { display: flex !important; font-size: 13.5px; }
+}

@@ -1,7 +1,7 @@
 // Headless balance check: plays AI-only games and reports pacing.
-import { Game } from '../src/game.js';
-import { choosePlacement, aiStep } from '../src/ai.js';
-import { HOME_LEVELS, WIN_GOAL } from '../src/data.js';
+import { Game } from '../src/core/game.js';
+import { choosePlacement, aiStep } from '../src/core/ai.js';
+import { HOME_LEVELS, WIN_GOAL } from '../src/core/data.js';
 
 const N = Number(process.argv[2] || 30);
 const results = [];

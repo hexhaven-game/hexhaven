@@ -25,12 +25,24 @@ export const ICONS = {
   hammer: 'M3 19.5l9-9 2 2-9 9zM10.5 6.5l4.5-3.5 6 6-3.5 4.5-2-2-2 2-3-3 2-2z',
   next: 'M5 11h10.2l-3.6-3.6L13 6l6 6-6 6-1.4-1.4 3.6-3.6H5z',
   close: 'M6.4 5L12 10.6 17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z',
+  // seasons
+  spring: 'M9.20 7.00a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0zM13.96 10.45a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0zM12.14 16.05a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0zM6.26 16.05a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0zM4.44 10.45a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0zM10.00 12.00a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z',
+  summer: 'M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10zM11 1h2v4h-2zM11 19h2v4h-2zM1 11h4v2H1zM19 11h4v2h-4zM4.2 5.6l1.4-1.4 2.8 2.8-1.4 1.4zM15.6 17l1.4-1.4 2.8 2.8-1.4 1.4zM4.2 18.4l2.8-2.8 1.4 1.4-2.8 2.8zM15.6 7l2.8-2.8 1.4 1.4-2.8 2.8z',
+  autumn: 'M4 20c0-9 5-15 16-16c-1 11-7 16-16 16z',
+  winter: 'M12.00 12.00L13.30 6.50L12.00 1.80L10.70 6.50zM12.00 12.00L17.41 10.38L20.83 6.90L16.11 8.12zM12.00 12.00L16.11 15.88L20.83 17.10L17.41 13.62zM12.00 12.00L10.70 17.50L12.00 22.20L13.30 17.50zM12.00 12.00L6.59 13.62L3.17 17.10L7.89 15.88zM12.00 12.00L7.89 8.12L3.17 6.90L6.59 10.38z',
+};
+
+// Default tints, so a resource looks the same in the top bar, a dialog or a log line.
+// Applied with zero specificity (:where in the CSS), so a context can still recolour an icon.
+export const ICON_COLOR = {
+  wood: '#9a6a40', stone: '#7f8a87', grain: '#d69e1c', veg: '#e0702a', wool: '#9c86c2', gold: '#d9a514', crown: '#d9a514',
+  spring: '#f07aa8', summer: '#f0b02c', autumn: '#e0702a', winter: '#8fc8e8',
 };
 
 export function svg(name, cls = 'ic') {
   const d = ICONS[name];
   if (!d) return '';
-  return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${d}"/></svg>`;
+  return `<svg class="${cls} i-${name}" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="${d}"/></svg>`;
 }
 
 export const EMOJI_TO_ICON = {
