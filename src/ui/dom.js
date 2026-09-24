@@ -27,15 +27,19 @@ export function toast(title, sub = '', ms = 2000) {
 
 export let modalClose = null;
 
-export function openModal(html, bind, { onClose, wide, noDim } = {}) {
+// Every dialog gets a close button top-right (unless noClose); `bind` receives the dialog body,
+// which is the element dialogs redraw, so the button survives redraws.
+export function openModal(html, bind, { onClose, wide, noDim, noClose } = {}) {
   const m = $('#modal');
   const card = m.querySelector('.card');
-  card.innerHTML = html;
+  card.innerHTML = `${noClose ? '' : `<button class="mclose" aria-label="Close" title="Close (Esc)">${svg('close')}</button>`}<div class="mbody">${html}</div>`;
   card.classList.toggle('wide', !!wide);
   m.classList.toggle('nodim', !!noDim);
   m.classList.remove('hidden');
   modalClose = onClose || null;
-  bind?.(card);
+  const x = card.querySelector('.mclose');
+  if (x) x.onclick = () => closeModal();
+  bind?.(card.querySelector('.mbody'));
   $('#tooltip').style.display = 'none';
 }
 

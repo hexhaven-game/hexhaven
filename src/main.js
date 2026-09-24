@@ -14,6 +14,7 @@ import { showEconomy } from './ui/dialogs/economy.js';
 import { showOrdersHelp } from './ui/dialogs/orders.js';
 import { showHelp } from './ui/dialogs/help.js';
 import { showSettings } from './ui/dialogs/settings.js';
+import { renderTimeline, bindTimeline, showTimeline, mountTimeline } from './ui/timeline.js';
 
 // ---------- changelog (the same CHANGELOG.md that lives in the repo root) ----------
 
@@ -595,6 +596,7 @@ function render() {
   if (!inGame) return;
   renderPlayers();
   renderStatus();
+  renderTimeline();
   renderGoal();
   renderScore();
   renderHand();
@@ -654,23 +656,27 @@ function renderStatus() {
     // phones: one bar with round, your actions and everyone's score (whose turn it is shows at
     // the bottom); tapping the scores drops down the full player cards
     $('#status').innerHTML = `
-      <span class="seg"><span class="sem">${svg(S.icon)}</span><b>${game.round}<span class="of">/${game.lastRound}</span></b></span>
+      <button class="seg tl-open" data-act="timeline" title="What's coming"><span class="sem">${svg(S.icon)}</span><b>${game.round}<span class="of">/${game.lastRound}</span></b></button>
       ${mode.kind === 'action' ? `<span class="seg"><span class="gpips">${pips}</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>` : ''}
 
       <button class="standings" title="Players">${game.players.map((p) => `
         <span class="mini ${cur === p.id ? 'active' : ''}" style="--c:${hexColor(p.color)}"><i>${p.name[0]}</i>${p.prosp}</span>`).join('')}</button>`;
     return;
   }
+  // desktop: short and quiet; the words live in hover tips, the timeline sits in the middle
+  const actTip = left > 0 || me.freeExplore ? `${left} action${left === 1 ? '' : 's'} left · tap your land` : 'Actions used · end your turn';
   $('#status').innerHTML = `
-    <span class="seg"><span class="sem">${svg(S.icon)}</span><b>${S.name}</b><span class="lbl">Year ${game.year}</span></span>
+    <span class="seg" data-tip="${S.name} · Year ${game.year}"><span class="sem">${svg(S.icon)}</span><b>Y${game.year}</b></span>
     <i class="vdiv"></i>
-    <span class="seg lbl">Round ${game.round}<span class="of">/${game.lastRound}</span></span>
+    <span class="tl-slot"></span>
+    <b class="seg rnd">${game.round}<span class="of">/${game.lastRound}</span></b>
     <i class="vdiv"></i>
     ${placing
       ? '<span class="seg"><span class="lbl">Place a tile</span></span>'
       : mode.kind === 'action'
-        ? `<span class="seg"><span class="gpips">${pips}</span><span class="lbl">${left > 0 || me.freeExplore ? `${left} action${left === 1 ? '' : 's'} left · tap your land` : 'Actions used · end your turn'}</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>`
+        ? `<span class="seg" data-tip="${actTip}"><span class="gpips">${pips}</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>`
         : `<span class="seg"><span class="lbl">${game.phase === 'world' ? 'Harvest' : 'Waiting'}</span></span>`}`;
+  mountTimeline($('#status .tl-slot'));
 }
 
 addEventListener('resize', () => { statusSig = ''; if (inGame) renderStatus(); });
@@ -1013,6 +1019,7 @@ document.addEventListener('click', (e) => {
     case 'improve': doAction(game.upgradeBuilding(pid, d.k)); break;
     case 'perk': doAction(game.buyPerk(pid, d.perk)); break;
     case 'recruit': doAction(game.recruit(pid)); break;
+    case 'timeline': showTimeline(); break;
     case 'market': showMarket(); break;
     case 'economy': showEconomy(); break;
     case 'trade': showTrade(); break;
@@ -1074,11 +1081,12 @@ function showEnd() {
       if (b.dataset.e === 'menu') { writeJSON('hexhaven-boot', { action: 'menu' }, sessionStorage); location.reload(); }
       if (b.dataset.e === 'new') showNewGame();
     };
-  });
+  }, { noClose: true });
 }
 
 // dialogs call back into the loop through these
 Object.assign(hooks, { render, refreshHighlights, doAction });
+bindTimeline();
 
 // ---------- boot ----------
 async function boot() {

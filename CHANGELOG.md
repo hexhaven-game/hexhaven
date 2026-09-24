@@ -2,6 +2,19 @@
 
 All notable changes to Hexhaven. The game reads this file too: the version in the main menu opens it.
 
+## 0.4 — 24-09-2026
+
+### New
+- Timeline: every round of the game as a strip in the status bar, coloured by season, with markers for what's coming (your crops ripening, harvest fairs, bandit risk at each new season, year 2, the last round). Hover a round for details, click for a full "What's coming" list. On phones, tap the round number.
+- Every dialog has a close button in the top-right corner.
+
+### Improved
+- Desktop status bar is compact: season icon, year, timeline, round and your actions. Longer explanations show on hover.
+- One icon style everywhere: trade, market and order dialogs use the same coloured resource icons as the top bar, and seasons have their own icons.
+- Scouted finds that sit next to each other join into one sand bank instead of separate islets.
+- Phones: the turn banner is one small line, and an opponent's turn is shown once, at the bottom.
+- The code is split into core rules, rendering and UI modules, so the game is easier to extend.
+
 ## 0.3.1 — 24-09-2026
 
 ### Improved

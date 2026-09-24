@@ -1025,8 +1025,10 @@ export class World3D {
     const rng = seededRng(`${k}islet`);
     const g = new THREE.Group();
     const top = 0.2;
-    g.add(mesh(G.disc(6), M(0xefdca2), 0, top - 0.07, 0, 0.8, 0.14, 0.8));
-    g.add(mesh(G.disc(6), SM('grass', 0xa9d57a), 0, top + 0.005, 0, 0.66, 0.03, 0.66));
+    // a full-size sand bank, so neighbouring finds join into one shoal instead of separate islets;
+    // it stays low and pale so it still reads as unclaimed, not as someone's land
+    g.add(mesh(G.disc(6), M(0xefdca2), 0, top - 0.07, 0, 1, 0.14, 1));
+    g.add(mesh(G.disc(6), SM('grass', 0xa9d57a), 0, top + 0.005, 0, 0.7, 0.03, 0.7));
     for (const p of pointsInHex(rng, 3, { rMax: 0.55, avoidCenter: 0.4 })) {
       g.add(mesh(G.cone(5), SM('grass', 0x6cc043), p.x, top + 0.05, p.z, 0.04, 0.09, 0.04));
     }
@@ -1048,7 +1050,6 @@ export class World3D {
     const baked = bake(g);
     const { x, z } = toWorld(k);
     baked.position.set(x, 0, z);
-    baked.userData.bob = rng() * 6;
     return baked;
   }
 
@@ -1648,7 +1649,6 @@ export class World3D {
 
     this.styleGhosts(time);
     for (const islet of this.poiIcons.values()) {
-      islet.position.y = Math.sin(time * 1.2 + islet.userData.bob) * 0.025;
       for (const d of islet.userData.dyn || []) if (d.userData.dynamic === 'flicker') d.scale.y = 0.16 * (0.8 + Math.random() * 0.3);
     }
     this.particles.update(dt);
