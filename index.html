@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hexhaven</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%234f9e38' d='M12 2l8.66 5v10L12 22l-8.66-5V7z'/></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="in-menu">
+    <div id="scene"></div>
+    <div id="hud">
+      <div id="tl">
+        <button id="menuBtn" class="hexicon-btn" title="Menu (Esc)"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16v2H4zM4 11h16v2H4zM4 15h16v2H4z" /></svg></button>
+        <div id="players"></div>
+      </div>
+      <div id="status"></div>
+      <div id="goal" class="hidden"></div>
+      <div id="score"></div>
+      <div id="hand"></div>
+      <div id="panel" class="hidden"></div>
+      <div id="synergy" class="hidden"></div>
+      <div id="log"></div>
+    </div>
+    <div id="toast"></div>
+    <div id="tooltip"></div>
+    <div id="menu" class="hidden"></div>
+    <div id="modal" class="hidden"><div class="card"></div></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
