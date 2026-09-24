@@ -522,36 +522,19 @@ table.eco .ico { width: 26px; height: 26px; border-radius: 50%; display: grid; p
 #modal.nodim { background: transparent; pointer-events: none; }
 #modal.nodim .card { pointer-events: auto; box-shadow: 0 12px 40px rgba(47, 58, 54, 0.28); }
 
-/* ---------- title screen intro (also the crawlable description of the page) ---------- */
+/* ---------- page description: off-screen, but present in the DOM ----------
+   The title screen has no visible copy of its own, so the H1 and the short
+   description that crawlers and screen readers use live here. */
 #intro {
-  position: fixed;
-  right: 5vw;
-  bottom: 5vh;
-  z-index: 8;
-  max-width: 38ch;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
   pointer-events: none;
-  padding: 14px 18px 15px;
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.93);
-  box-shadow: var(--shadow);
-  animation: introIn 0.7s var(--out) 0.5s backwards;
-}
-body:not(.in-menu) #intro { display: none; }
-body:has(#modal:not(.hidden)) #intro { display: none; }
-#intro h1 {
-  margin: 0 0 8px;
-  font: 600 15px/1 Fredoka, sans-serif;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-}
-#intro .intro-lead { margin: 0 0 7px; font: 600 14.5px/1.5 Nunito, sans-serif; color: var(--ink); }
-#intro .intro-meta { margin: 0; font: 600 12.5px/1.5 Nunito, sans-serif; color: var(--ink-2); }
-#intro a { color: var(--accent); }
-@keyframes introIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
-
-@media (max-width: 700px) {
-  #intro { left: 5vw; right: 5vw; bottom: 3vh; max-width: none; padding: 11px 14px 12px; }
-  #intro .intro-lead { font-size: 13.5px; }
-  #intro .intro-meta { font-size: 12px; }
 }
