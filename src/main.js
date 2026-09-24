@@ -6,6 +6,35 @@ import {
   SEASONS, BONUSES, WIN_GOAL, BUILDING_UPGRADES, PERKS, PLACEABLE,
 } from './data.js';
 import { svg, iconify } from './icons.js';
+import changelogMd from '../CHANGELOG.md?raw';
+
+// ---------- changelog (the same CHANGELOG.md that lives in the repo root) ----------
+function parseChangelog(md) {
+  const releases = [];
+  let rel = null;
+  let sec = null;
+  for (const raw of md.split('\n')) {
+    const line = raw.trim();
+    const v = line.match(/^##\s+([\d.]+)\s*[—-]\s*(.+)$/);
+    if (v) {
+      rel = { version: v[1], date: v[2].trim(), sections: [] };
+      releases.push(rel);
+      sec = null;
+      continue;
+    }
+    const h = line.match(/^###\s+(.+)$/);
+    if (h && rel) {
+      sec = { title: h[1].trim(), items: [] };
+      rel.sections.push(sec);
+      continue;
+    }
+    const item = line.match(/^[-*]\s+(.+)$/);
+    if (item && sec) sec.items.push(item[1]);
+  }
+  return releases;
+}
+const RELEASES = parseChangelog(changelogMd);
+const APP_VERSION = RELEASES[0]?.version ?? '0';
 
 const $ = (s) => document.querySelector(s);
 const hexColor = (c) => `#${c.toString(16).padStart(6, '0')}`;
@@ -35,7 +64,7 @@ function saveMeta(d) {
   const season = SEASONS[Math.floor((r - 1) / 3) % 4];
   const year = Math.floor((r - 1) / 12) + 1;
   const ago = Math.round((Date.now() - d.savedAt) / 60000);
-  const when = ago < 1 ? 'just now' : ago < 60 ? `${ago} min ago` : new Date(d.savedAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+  const when = ago < 1 ? 'just now' : ago < 60 ? `${ago} min ago` : new Date(d.savedAt).toLocaleString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   return `Year ${year}, ${season.name.toLowerCase()} · ${when}`;
 }
 
@@ -173,6 +202,7 @@ function buildDemoWorld() {
   game.quests = [];
   muted = false;
   world.setSeason([0, 1, 2][Math.floor(Math.random() * 3)], true);
+  world.showNames = false; // the title island is anonymous: no player names
   world.playIntro();
 }
 
@@ -196,7 +226,7 @@ function showMainMenu() {
         <button data-m="settings">Settings</button>
         <button data-m="help">How to play</button>
       </nav>
-      <p class="version">prototype 0.2</p>
+      <button class="version" data-m="changelog" title="What's new">Version ${APP_VERSION}</button>
     </div>`;
   menu.classList.remove('hidden');
   menu.onclick = (e) => {
@@ -208,6 +238,7 @@ function showMainMenu() {
       load: () => showSlots('load'),
       settings: () => showSettings(),
       help: () => showHelp(),
+      changelog: () => showChangelog(),
     })[b.dataset.m]();
   };
 }
@@ -357,6 +388,29 @@ function showHelp() {
   });
 }
 
+function showChangelog() {
+  const esc = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  // dates are written Dutch-style (dd-mm-yyyy) in CHANGELOG.md and shown as-is
+  const fmtDate = (d) => d;
+  const kind = (title) => ({ new: 'new', improved: 'improved', fixed: 'fixed', fix: 'fixed' }[title.toLowerCase()] || 'other');
+  const release = (r) => `
+    <div class="rel-head"><b>Version ${r.version}</b><span>${fmtDate(r.date)}</span></div>
+    ${r.sections.map((sec) => `
+      <div class="rel-sec">
+        <span class="rel-tag ${kind(sec.title)}">${esc(sec.title)}</span>
+        <ul>${sec.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+      </div>`).join('')}`;
+  openModal(`
+    <h2>What's new</h2>
+    <div class="changelog">
+      ${RELEASES.length ? release(RELEASES[0]) : '<p class="note">No changes recorded yet.</p>'}
+      ${RELEASES.slice(1).map((r) => `<details class="rel-old"><summary><i class="chev" aria-hidden="true"></i>Version ${r.version} <span>${fmtDate(r.date)}</span></summary>${release(r)}</details>`).join('')}
+    </div>
+    <div class="actions"><button class="primary" data-x="close">Close</button></div>`, (card) => {
+    card.querySelector('[data-x]').onclick = closeModal;
+  }, { wide: true });
+}
+
 function showPause() {
   openModal(`
     <h2>Paused</h2>
@@ -367,6 +421,7 @@ function showPause() {
       <button data-p="new">New game</button>
       <button data-p="settings">Settings</button>
       <button data-p="help">How to play</button>
+      <button data-p="changelog">What's new</button>
       <button data-p="menu">Main menu</button>
     </nav>`, (card) => {
     card.onclick = (e) => {
@@ -379,6 +434,7 @@ function showPause() {
         new: showNewGame,
         settings: showSettings,
         help: showHelp,
+        changelog: showChangelog,
         menu: () => { writeJSON('hexhaven-boot', { action: 'menu' }, sessionStorage); location.reload(); },
       })[b.dataset.p]();
     };
@@ -549,10 +605,10 @@ function selectOffer(i) {
 }
 
 // ---------- world input ----------
-world.onClick = (k) => {
-  if (modalOpen() || !inGame) return;
-  if (mode.kind === 'place') {
-    if (!mode.valid.includes(k)) return;
+// Place the held tile on k (from a click, a second tap, or the "Place here" button)
+function placeHeldAt(k) {
+  if (mode.kind !== 'place' || !mode.valid.includes(k)) return;
+  {
     const p = game.players[mode.pid];
     const type = p.offer[mode.sel];
     const pv = game.placementPreview(p.id, type, k);
@@ -569,6 +625,19 @@ world.onClick = (k) => {
     mode = { kind: 'idle' };
     game.placeTile(p.id, type, k);
     r();
+  }
+}
+
+world.onClick = (k, info = {}) => {
+  if (modalOpen() || !inGame) return;
+  if (mode.kind === 'place') {
+    // touch has no hover: the first tap previews the spot (held tile, score, reason), the
+    // second tap on the same spot places it
+    if (info.touch && world.hoverKey !== k) {
+      world.hoverAt(k);
+      return;
+    }
+    placeHeldAt(k);
     return;
   }
   if (mode.kind === 'action') {
@@ -583,6 +652,9 @@ world.onClick = (k) => {
 // ---------- synergy preview while holding a tile ----------
 let synKey = null;
 let synSig = '';
+$('#synergy').addEventListener('click', (e) => {
+  if (e.target.closest('[data-place]') && synKey) placeHeldAt(synKey);
+});
 function updateSynergy() {
   const el = $('#synergy');
   const k = world.hoverKey;
@@ -596,7 +668,7 @@ function updateSynergy() {
   synSig = sig;
   const pv = game.placementPreview(mode.pid, type, k);
   world.showSynergy(k, pv.links);
-  el.innerHTML = `<div class="syn-wrap"><div class="syn-gain">+${pv.gain}${svg('crown')}</div>${pv.notes.map((n) => `<div class="syn-note">${svg(n.icon)}${n.text}</div>`).join('')}</div>`;
+  el.innerHTML = `<div class="syn-wrap"><div class="syn-gain">+${pv.gain}${svg('crown')}</div>${pv.notes.map((n) => `<div class="syn-note">${svg(n.icon)}${n.text}</div>`).join('')}${world.touch ? '<button class="syn-place" data-place>Place here</button>' : ''}</div>`;
   el.classList.toggle('rich', pv.notes.length > 0);
   if (synKey !== k) {
     el.classList.remove('hidden', 'pop');
@@ -616,7 +688,7 @@ function positionSynergy() {
 world.onHover = (k, e) => {
   if (mode.kind === 'place') { renderGoal(); updateSynergy(); }
   const tip = $('#tooltip');
-  if (!k || modalOpen() || !inGame || (mode.kind === 'place' && mode.valid.includes(k))) {
+  if (!k || !e || modalOpen() || !inGame || (mode.kind === 'place' && mode.valid.includes(k))) {
     tip.style.display = 'none';
     return;
   }
@@ -688,19 +760,31 @@ function render() {
 // resources shown on the small player cards on the left
 const CARD_RES = ['gold', 'wood', 'wool'];
 
+let openCard = null;
 function renderPlayers() {
   const cur = current();
   $('#players').innerHTML = game.players.map((p) => `
-    <div class="pcard ${cur === p.id ? 'active' : ''}" style="--c:${hexColor(p.color)}">
+    <div class="pcard ${cur === p.id ? 'active' : ''} ${openCard === p.id ? 'open' : ''}" data-pid="${p.id}" style="--c:${hexColor(p.color)}"
+      title="${p.name}: ${RES.map((r) => `${RES_INFO[r].name} ${p.res[r]}`).join(', ')}">
       <div class="phead">
+        <span class="pav">${p.name[0]}</span>
         <span class="pname">${p.name}${p.isAI ? '' : '<em>you</em>'}</span>
-        <span class="pscore">${svg('crown')}${p.prosp}${p.isAI ? '' : `<small>/${WIN_GOAL}</small>`}</span>
+        <span class="pscore">${svg('crown')}${p.prosp}</span>
       </div>
+      <div class="pbar"><i style="width:${Math.min(100, (p.prosp / WIN_GOAL) * 100)}%"></i></div>
       <div class="pres">
-        ${CARD_RES.map((r) => `<span class="r" style="--rc:${RES_COLOR[r]}" title="${RES_INFO[r].name}">${svg(r)}<b>${p.res[r]}</b></span>`).join('')}
+        ${RES.map((r) => `<span class="r" style="--rc:${RES_COLOR[r]}">${svg(r)}<b>${p.res[r]}</b></span>`).join('')}
       </div>
     </div>`).join('');
 }
+// tap/click a player card to peek at their resources
+$('#players').addEventListener('click', (e) => {
+  const c = e.target.closest('.pcard');
+  if (!c) return;
+  const pid = Number(c.dataset.pid);
+  openCard = openCard === pid ? null : pid;
+  renderPlayers();
+});
 
 let statusSig = '';
 function renderStatus() {
@@ -710,9 +794,22 @@ function renderStatus() {
   const total = HOME_LEVELS[game.homeTile(me.id).level].actions;
   const pips = Array.from({ length: total }, (_, i) => `<i class="${i >= left ? 'used' : ''}"></i>`).join('');
   const placing = mode.kind === 'place' && mode.pid === me.id;
-  const sig = `${game.season}|${game.year}|${game.round}|${game.lastRound}|${left}|${me.freeExplore}|${total}|${placing}`;
+  const compact = innerWidth <= 760;
+  const sig = `${game.season}|${game.year}|${game.round}|${game.lastRound}|${left}|${me.freeExplore}|${total}|${placing}|${mode.kind}|${game.phase}|${compact}`;
   if (sig === statusSig) return;
   statusSig = sig;
+  if (compact) {
+    // phones: just the essentials, icons over words
+    const cur = current();
+    const who = cur != null && game.players[cur].isAI ? game.players[cur] : null;
+    $('#status').innerHTML = `
+      <span class="seg"><span class="sem">${S.icon}</span><b>${game.round}<span class="of">/${game.lastRound}</span></b></span>
+      ${mode.kind === 'action' ? `<span class="seg"><span class="gpips">${pips}</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>` : ''}
+      ${placing ? '<span class="seg lbl">Your tile</span>' : ''}
+      ${who ? `<span class="seg lbl"><span class="dot" style="--c:${hexColor(who.color)}"></span>${who.name}</span>` : ''}
+      ${game.phase === 'world' ? '<span class="seg lbl">Harvest</span>' : ''}`;
+    return;
+  }
   $('#status').innerHTML = `
     <span class="seg"><span class="sem">${S.icon}</span><b>${S.name}</b><span class="lbl">Year ${game.year}</span></span>
     <i class="vdiv"></i>
@@ -720,8 +817,12 @@ function renderStatus() {
     <i class="vdiv"></i>
     ${placing
       ? '<span class="seg"><span class="lbl">Place a tile</span></span>'
-      : `<span class="seg"><span class="gpips">${pips}</span><span class="lbl">${left} action${left === 1 ? '' : 's'} left</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>`}`;
+      : mode.kind === 'action'
+        ? `<span class="seg"><span class="gpips">${pips}</span><span class="lbl">${left > 0 || me.freeExplore ? `${left} action${left === 1 ? '' : 's'} left · tap your land` : 'Actions used · end your turn'}</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>`
+        : `<span class="seg"><span class="lbl">${game.phase === 'world' ? 'Harvest' : 'Waiting'}</span></span>`}`;
 }
+
+addEventListener('resize', () => { statusSig = ''; if (inGame) renderStatus(); });
 
 let goalSig = '';
 function renderGoal() {
@@ -738,20 +839,13 @@ function renderGoal() {
     // hovering only patches the hint line (below), it never rebuilds the banner
     const held = TILE_TYPES[me.offer[mode.sel]].name;
     sig = `place|${me.bonusTiles}|${me.offer.join(',')}`;
+    const swap = world.touch ? 'tap a card to swap' : `1–${me.offer.length} to swap`;
     html = `<div class="goal-head">${me.bonusTiles > 0 ? 'Bonus tile' : 'Your turn'}</div>
-      ${steps([`${held} in hand · 1–${me.offer.length} to swap`, 'Drop it on a glowing spot'], 1)}
+      ${steps([`${held} in hand · ${swap}`, world.touch ? 'Tap a glowing spot, tap again to place' : 'Drop it on a glowing spot'], 1)}
       <div class="goal-hint"></div>`;
   } else if (mode.kind === 'action') {
-    const me = human();
-    const left = me.actionsLeft;
-    sig = `action|${left}|${me.freeExplore}`;
-    html = left > 0 || me.freeExplore
-      ? `<div class="goal-head">All yours</div>
-         <div class="goal-sub">Tap your farm, a field or a glowing tile${me.freeExplore ? ' · one free scout' : ''}</div>
-         <div class="goal-foot">First to ${WIN_GOAL} prosperity wins</div>`
-      : `<div class="goal-head">Actions used</div>
-         <div class="goal-sub">Trade or sell if you like, then end your turn.</div>
-         <div class="goal-foot">First to ${WIN_GOAL} prosperity wins</div>`;
+    // the status bar says how many actions are left; no extra panel needed
+    sig = 'action';
   } else if (p && !p.isAI) {
     sig = 'ready';
   } else if (p) {
@@ -773,7 +867,7 @@ function renderGoal() {
   if (mode.kind === 'place') {
     const me = game.players[mode.pid];
     const label = $('#goal .step span');
-    const text = `${TILE_TYPES[me.offer[mode.sel]].name} in hand · 1–${me.offer.length} to swap`;
+    const text = `${TILE_TYPES[me.offer[mode.sel]].name} in hand · ${world.touch ? 'tap a card to swap' : `1–${me.offer.length} to swap`}`;
     if (label && label.textContent !== text) label.textContent = text;
     const k = world.hoverKey;
     let hint = '';

@@ -20,6 +20,8 @@ import { drawIcon, EMOJI_TO_ICON } from './icons.js';
 // - Shadow maps only re-render while something changes; resolution adapts to frame rate.
 
 const TOP = 0.3;
+// world-space name labels read fine on a monitor but crowd a phone screen
+const LABEL_SCALE = matchMedia('(pointer: coarse)').matches && innerWidth <= 760 ? 0.0065 : 0.01;
 const SEASON_IDS = { grass: 1, leaf: 2, pine: 3, rock: 4 };
 
 // ---------- toon materials (Link's Awakening-ish: soft bands, rim light, plastic glint) ----------
@@ -128,6 +130,8 @@ const G = {
   layer: () => geo('layer', () => new THREE.CylinderGeometry(1, 1, 0.07, 6).translate(0, 0.235, 0)),
   lip: () => geo('lip', () => new THREE.CylinderGeometry(1, 1, 0.03, 6).translate(0, TOP - 0.015, 0)),
   ghost: () => geo('ghost', () => new THREE.CylinderGeometry(0.93, 0.93, 0.03, 6)),
+  slotFill: () => geo('slotFill', () => new THREE.CircleGeometry(0.9, 6, Math.PI / 6).rotateX(-Math.PI / 2)),
+  slotRing: () => geo('slotRing', () => new THREE.RingGeometry(0.86, 0.905, 6, 1, Math.PI / 6).rotateX(-Math.PI / 2)),
   box: () => geo('box', () => new THREE.BoxGeometry(1, 1, 1)),
   cyl: (seg = 8) => geo(`cyl${seg}`, () => new THREE.CylinderGeometry(1, 1, 1, seg)),
   cone: (seg = 8) => geo(`cone${seg}`, () => new THREE.ConeGeometry(1, 1, seg)),
@@ -477,7 +481,7 @@ function buildForest(rng, t, g) {
   }
   if (t.building === 'lumber') {
     const h = house(0.3, 0.2, 0.26, 0xc9955e, 0x8a4a2e);
-    h.position.set(-0.1, TOP, 0.05);
+    h.position.set(t.poi ? -0.5 : -0.1, TOP, t.poi ? 0.3 : 0.05);
     g.add(h);
     for (let i = 0; i < 3; i++) {
       const log = mesh(G.cyl(8), M(0xa0683a), 0.2, TOP + 0.04 + (i === 2 ? 0.06 : 0), -0.05 + (i === 2 ? 0 : (i - 0.5) * 0.09), 0.04, 0.3, 0.04);
@@ -518,7 +522,7 @@ function buildMeadow(rng, t, g) {
       g.add(shed);
     }
   }
-  const nSheep = t.building === 'pen' ? 4 : t.owner != null ? 1 : 0;
+  const nSheep = t.poi ? 0 : t.building === 'pen' ? 4 : t.owner != null ? 1 : 0;
   for (const p of pointsInHex(rng, nSheep, { rMax: t.building === 'pen' ? 0.35 : 0.6 })) {
     const s = sheep(rng);
     s.position.set(p.x, TOP, p.z);
@@ -538,14 +542,19 @@ function buildField(rng, t, g, game) {
   const ripe = t.crop && t.crop.progress >= grow - 1;
   for (const z of rows) {
     const half = Math.sqrt(Math.max(0, 0.6 - z * z)) * 0.95;
+    const clearMid = t.poi && Math.abs(z) < 0.3; // leave the middle free for a ruin or mill
     if (!t.crop) {
-      g.add(mesh(G.box(), M(0x7a4e2e), 0, TOP + 0.035, z, half * 2, 0.035, 0.07));
+      if (clearMid) {
+        const seg = half - 0.34;
+        if (seg > 0.05) for (const sx of [-1, 1]) g.add(mesh(G.box(), M(0x7a4e2e), sx * (0.34 + seg / 2), TOP + 0.035, z, seg, 0.035, 0.07));
+      } else g.add(mesh(G.box(), M(0x7a4e2e), 0, TOP + 0.035, z, half * 2, 0.035, 0.07));
       continue;
     }
     const type = t.crop.type;
     const n = Math.max(2, Math.round(half * 8));
     for (let i = 0; i < n; i++) {
       const x = -half + (i + 0.5) * ((half * 2) / n);
+      if (clearMid && Math.abs(x) < 0.34) continue;
       if (type === 'wheat') {
         const h = 0.05 + 0.22 * k;
         g.add(mesh(G.box(), M(lerpColor(0x7cc84a, 0xf2cf4a, ripe ? 1 : k * 0.6)), x, TOP + 0.03 + h / 2, z, 0.08, h, 0.08));
@@ -575,10 +584,13 @@ function buildField(rng, t, g, game) {
 
 function buildMountain(rng, t, g) {
   const peaks = t.building === 'quarry' || t.poi ? 2 : 3;
-  const pts = pointsInHex(rng, peaks, { rMax: 0.4, minD: 0.3 });
+  // a ruin or mill owns the middle of the tile, so the peaks step aside to the rim
+  const pts = t.poi
+    ? pointsInHex(rng, peaks, { rMax: 0.72, minD: 0.45, avoidCenter: 0.5 })
+    : pointsInHex(rng, peaks, { rMax: 0.4, minD: 0.3 });
   pts.forEach((p, i) => {
-    const r = 0.32 + rng() * 0.18;
-    const h = (i === 0 ? 0.9 : 0.55) + rng() * 0.35;
+    const r = (t.poi ? 0.2 : 0.32) + rng() * (t.poi ? 0.1 : 0.18);
+    const h = (t.poi ? 0.45 : i === 0 ? 0.9 : 0.55) + rng() * (t.poi ? 0.2 : 0.35);
     const grey = [0xa89f92, 0x988f84, 0xb4ac9f][i % 3];
     const m = mesh(G.cone(7), SM('rock', grey), p.x, TOP + h / 2, p.z, r, h, r);
     m.rotation.y = rng() * 3;
@@ -1018,6 +1030,26 @@ const SHORE_OUT = 0.44;                   // how far the sand runs out before it
 const SHORE_WATERLINE = 0.62;             // the dry part of that slope
 const COAST_R = 1 + SHORE_OUT * SHORE_WATERLINE * 1.1547; // where the mask puts the shoreline
 const NO_TILES = new Map();
+const SHORE_RISE = 0.7; // seconds a beach strip takes to rise out of the sea after its tile lands
+const MASK_FADE = 0.3;  // seconds the sea's coastline blends from the previous mask to the new one
+
+// Beach strips carry the moment their tile lands (aBorn, on the world clock); the shader lifts
+// each strip out of the water from that moment, so the sand grows along with the island.
+function makeShoreMaterial() {
+  const m = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap, side: THREE.DoubleSide });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uNow = U.uTime;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        attribute float aBorn;
+        uniform float uNow;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float rise = clamp((uNow - aBorn) / ${SHORE_RISE.toFixed(2)}, 0.0, 1.0);
+        rise = rise * rise * (3.0 - 2.0 * rise);
+        transformed.y -= (1.0 - rise) * 0.55;`);
+  };
+  return m;
+}
 const GHOST_CAP = 400;
 const HL_MAT = new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 0.9, depthWrite: false });
 
@@ -1046,7 +1078,7 @@ export class World3D {
     this._c = new THREE.Color();
 
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' }));
-    this.maxPR = Math.min(devicePixelRatio, 2);
+    this.maxPR = Math.min(devicePixelRatio, matchMedia('(pointer: coarse)').matches ? 1.5 : 2);
     this.pr = this.maxPR;
     this.refreshEst = 60;
     r.shadowMap.enabled = true;
@@ -1065,6 +1097,9 @@ export class World3D {
     this.camera.position.set(3, 13, 15);
     const c = (this.controls = new OrbitControls(this.camera, r.domElement));
     c.enableDamping = true;
+    // touch: one finger drags the map, two fingers pinch-zoom and twist (map-app style)
+    this.touch = matchMedia('(pointer: coarse)').matches;
+    c.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
     c.maxPolarAngle = 1.05;
     c.minDistance = 6;
     c.maxDistance = 34;
@@ -1098,17 +1133,22 @@ export class World3D {
     for (const cv of [this.maskCanvas, this.maskShape, this.maskTint]) cv.width = cv.height = MASK_SIZE;
     this.maskTex = new THREE.CanvasTexture(this.maskCanvas);
     this.maskTex.flipY = false;
+    this.maskPrev = document.createElement('canvas');
+    this.maskPrev.width = this.maskPrev.height = MASK_SIZE;
+    this.maskPrevTex = new THREE.CanvasTexture(this.maskPrev);
+    this.maskPrevTex.flipY = false;
+    this.maskBlend = 1;
+    this.now = 0;
     this.waterMat = createWaterMaterial(this.maskTex, MASK_EXTENT);
     this.waterMat.uniforms.uMask.value = this.maskTex;
+    this.waterMat.uniforms.uMaskPrev.value = this.maskPrevTex;
     const water = new THREE.Mesh(new THREE.PlaneGeometry(240, 240, 48, 48).rotateX(-Math.PI / 2), this.waterMat);
     water.position.y = WATER_Y;
     scene.add(water);
     this.maskDirty = true;
     this.maskTimer = 0;
     // hexagonal beaches: sand running from every open coast edge down into the sea (one merged mesh)
-    this.shore = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshToonMaterial({
-      vertexColors: true, gradientMap, side: THREE.DoubleSide,
-    }));
+    this.shore = new THREE.Mesh(new THREE.BufferGeometry(), makeShoreMaterial());
     this.shore.receiveShadow = true;
     this.shore.position.y = 0;
     scene.add(this.shore);
@@ -1126,8 +1166,16 @@ export class World3D {
     scene.add(this.tilesGroup, this.fxGroup, this.previewGroup);
 
     // frontier ghosts: one instanced mesh + one Points draw for the '?' markers
-    this.ghosts = new THREE.InstancedMesh(G.ghost(), new THREE.MeshToonMaterial({
-      gradientMap, transparent: true, opacity: 0.42, depthWrite: false,
+    // open sea slots: a thin outline for every slot, a soft coloured fill only where you can act
+    this.ghostRings = new THREE.InstancedMesh(G.slotRing(), new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false,
+    }), GHOST_CAP);
+    this.ghostRings.count = 0;
+    this.ghostRings.setColorAt(0, new THREE.Color());
+    this.ghostRings.frustumCulled = false;
+    scene.add(this.ghostRings);
+    this.ghosts = new THREE.InstancedMesh(G.slotFill(), new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.42, depthWrite: false,
     }), GHOST_CAP);
     this.ghosts.count = 0;
     this.ghosts.setColorAt(0, new THREE.Color());
@@ -1135,7 +1183,7 @@ export class World3D {
     scene.add(this.ghosts);
     const q = textTexture('?', { bg: null, fg: '#9fb3ad', size: 90, pad: 10 });
     this.qPoints = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({
-      map: q.tex, size: 0.7, transparent: true, opacity: 0.8, depthWrite: false, alphaTest: 0.05,
+      map: q.tex, size: 0.5, transparent: true, opacity: 0.55, depthWrite: false, alphaTest: 0.05,
     }));
     this.qPoints.frustumCulled = false;
     scene.add(this.qPoints);
@@ -1221,7 +1269,7 @@ export class World3D {
 
   setQuality(q) {
     this.quality = q;
-    this.maxPR = q === 'high' ? Math.min(devicePixelRatio, 2) : 1;
+    this.maxPR = q === 'high' ? Math.min(devicePixelRatio, this.touch ? 1.5 : 2) : 1;
     this.pr = Math.min(this.pr, this.maxPR);
     const size = q === 'high' ? 2048 : 1024;
     this.sun.shadow.mapSize.set(size, size);
@@ -1263,6 +1311,8 @@ export class World3D {
 
   setMenuMode(on) {
     this.menuMode = on;
+    // the title screen is a picture, not a board: no badges cluttering it
+    this.badges.visible = !on;
     this.controls.autoRotate = on;
     this.controls.autoRotateSpeed = 0.5;
     this.controls.enabled = !on;
@@ -1280,7 +1330,9 @@ export class World3D {
   applyViewShift() {
     const w = this.el.clientWidth;
     const h = this.el.clientHeight;
+    // desktop menu: island right of the menu text; phone menu: island below the menu text
     if (this.viewShift > 0.001 && w > 800) this.camera.setViewOffset(w, h, -w * this.viewShift, 0, w, h);
+    else if (this.viewShift > 0.001) this.camera.setViewOffset(w, h, 0, -h * this.viewShift * 1.6, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   }
@@ -1375,6 +1427,7 @@ export class World3D {
     this.ghostKeys = [];
     this.ghostSet = new Set();
     this.ghosts.count = 0;
+    this.ghostRings.count = 0;
     this.fxGroup.clear();
     this.previewGroup.clear();
     this.particles.list = [];
@@ -1400,6 +1453,20 @@ export class World3D {
   // Menu -> game without a cut: the menu island sinks away from the rim inwards while the real
   // world drops in from the centre outwards, and the camera glides from the menu view to the player
   // The sandbanks are always first: they well up out of the sea, then the tiles land on them
+  // Detach the current beach mesh and let it sink away (used when one island replaces another)
+  sinkShore(dur = 0.9) {
+    const old = this.shore;
+    const fresh = new THREE.Mesh(new THREE.BufferGeometry(), old.material);
+    fresh.receiveShadow = true;
+    this.scene.add(fresh);
+    this.shore = fresh;
+    this.animate(dur, (k) => { old.position.y = -0.7 * k * k; }, () => {
+      this.scene.remove(old);
+      old.geometry.dispose();
+    });
+    this.maskDirty = true;
+  }
+
   revealLand(dur = 1.1) {
     const s = this.shore;
     s.scale.set(1, 1, 1);
@@ -1417,6 +1484,8 @@ export class World3D {
   }
 
   transitionTo(homeKey) {
+    this.showNames = true;
+    this.badges.visible = true;
     const old = [...this.tileObjs.values()];
     this.tileObjs = new Map();
     this.maskDirty = true;
@@ -1426,6 +1495,7 @@ export class World3D {
     this.ghostKeys = [];
     this.ghostSet = new Set();
     this.ghosts.count = 0;
+    this.ghostRings.count = 0;
     this.qPoints.geometry.dispose();
     this.qPoints.geometry = new THREE.BufferGeometry();
     for (const sp of this.poiIcons.values()) { this.scene.remove(sp); this.disposeGroup(sp); }
@@ -1447,9 +1517,9 @@ export class World3D {
       }, () => this.disposeTile(o), delay);
     }
 
-    // beaches first: build the whole coastline up front and let it rise out of the water
-    this.updateMask(true);
-    const beach = this.revealLand(0.9);
+    // the old island's beach sinks with it; the new beaches grow tile by tile as they land
+    this.sinkShore();
+    const beach = 0;
 
     const fresh = [...this.game.tiles.values()].map((t) => {
       const { x, z } = toWorld(t.key);
@@ -1483,8 +1553,7 @@ export class World3D {
   // Title sequence: the island assembles itself in rings while the camera swoops in
   playIntro() {
     this.reset();
-    this.updateMask(true);
-    const beach = this.revealLand(1.15);
+    const beach = 0.2;
     const tiles = [...this.game.tiles.values()].map((t) => {
       const { x, z } = toWorld(t.key);
       return { t, d: Math.hypot(x, z) };
@@ -1593,7 +1662,7 @@ export class World3D {
       g.add(ring);
     }
     if (t.type === 'village' && !t.district) {
-      const label = textSprite('Haven', { bg: '#2f3a36', fg: '#f7d774', size: 40, pad: 22, scale: 0.012 });
+      const label = textSprite('Haven', { bg: '#2f3a36', fg: '#f7d774', size: 40, pad: 22, scale: LABEL_SCALE * 1.2 });
       label.position.set(0, TOP + 2.25, 0);
       g.add(label);
     }
@@ -1606,9 +1675,9 @@ export class World3D {
       road.receiveShadow = true;
       g.add(road);
     }
-    if (t.type === 'home') {
+    if (t.type === 'home' && this.showNames !== false) {
       const p = this.game.players[t.owner];
-      const label = textSprite(p.name, { bg: `#${p.color.toString(16).padStart(6, '0')}`, fg: '#ffffff', size: 34, scale: 0.01 });
+      const label = textSprite(p.name, { bg: `#${p.color.toString(16).padStart(6, '0')}`, fg: '#ffffff', size: 34, scale: LABEL_SCALE });
       label.position.set(0, TOP + 1.35, 0);
       g.add(label);
     }
@@ -1641,6 +1710,10 @@ export class World3D {
     const o = { holder, g };
     this.tileObjs.set(t.key, o);
     this.maskDirty = true;
+    // when the tile touches down (world clock): its beach strips and coastline appear from then
+    this.landAt ??= new Map();
+    const fromHand = this.pendingDrop?.key === t.key;
+    this.landAt.set(t.key, animate ? this.now + delay + (fromHand ? 0.42 : 0.6) * 0.55 : -1e6);
     if (this.highlightKeys.has(t.key)) this.addHL(o);
     this.shadowFrames = Math.max(this.shadowFrames, 2);
     if (animate) {
@@ -1790,6 +1863,8 @@ export class World3D {
     const tiles = this.landTiles();
     const pos = [];
     const col = [];
+    const born = [];
+    this.landAt ??= new Map();
     const dry = new THREE.Color(0xf7e8ba);
     const wet = new THREE.Color(0xd3b87e);
     const shade = new THREE.Color();
@@ -1798,6 +1873,9 @@ export class World3D {
     const yBot = -0.12;            // the last band is under water, so the beach walks into the sea
     const out = SHORE_OUT;
     for (const t of tiles.values()) {
+      // a tile that isn't on the board yet contributes nothing (it adds its beach when it lands)
+      if (!this.tileObjs.has(t.key)) continue;
+      const tb = this.landAt.get(t.key) ?? -1e6;
       const c = toWorld(t.key);
       for (let i = 0; i < 6; i++) {
         const a0 = Math.PI / 2 + (i * Math.PI) / 3;
@@ -1836,6 +1914,7 @@ export class World3D {
           pos.push(px0, py, pz0, q0x, qy, q0z, q1x, qy, q1z);
           col.push(inR, inG, inB, shade.r, shade.g, shade.b, inR, inG, inB);
           col.push(inR, inG, inB, shade.r, shade.g, shade.b, shade.r, shade.g, shade.b);
+          for (let v = 0; v < 6; v++) born.push(tb);
           px0 = q0x;
           pz0 = q0z;
           px1 = q1x;
@@ -1847,23 +1926,33 @@ export class World3D {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setAttribute('aBorn', new THREE.Float32BufferAttribute(born, 1));
     g.computeVertexNormals();
     this.shore.geometry.dispose();
     this.shore.geometry = g;
     this.shadowFrames = Math.max(this.shadowFrames, 1);
   }
 
+  // tiles whose drop has touched down: those are what the sea's coastline follows
+  landedKeys() {
+    const now = this.now;
+    return [...this.tileObjs.keys()].filter((k) => (this.landAt?.get(k) ?? -1e6) <= now);
+  }
+
   updateMask(force = false) {
-    // the mask only depends on which cells are land, so skip the canvas work while an intro is
-    // dropping tiles into a world whose beaches were already built up front
-    const sig = this.landTiles().size;
-    if (!force && sig === this.maskSig) {
-      this.maskDirty = false;
-      return;
-    }
-    this.maskSig = sig;
     this.buildShore();
     this.maskDirty = false;
+    const landed = this.landedKeys();
+    const sig = landed.length;
+    if (!force && sig === this.maskSig) return;
+    this.maskSig = sig;
+    // keep the previous coastline and blend to the new one, so the sea never snaps
+    this.maskPrevCtx ??= this.maskPrev.getContext('2d');
+    this.maskPrevCtx.clearRect(0, 0, MASK_SIZE, MASK_SIZE);
+    this.maskPrevCtx.drawImage(this.maskCanvas, 0, 0);
+    this.maskPrevTex.needsUpdate = true;
+    this.waterMat.uniforms.uMaskMix.value = 0;
+    this.maskBlend = 0;
     const S = MASK_SIZE;
     const toPx = (v) => (v / (MASK_EXTENT * 2) + 0.5) * S;
     const sctx = this.maskShape.getContext('2d');
@@ -1881,7 +1970,7 @@ export class World3D {
     sctx.clearRect(0, 0, S, S);
     sctx.globalCompositeOperation = 'source-over';
     sctx.fillStyle = '#fff';
-    for (const k of this.landTiles().keys()) {
+    for (const k of landed) {
       const { x, z } = toWorld(k);
       hexPath(x, z, COAST_R);
       sctx.fill();
@@ -1946,7 +2035,7 @@ export class World3D {
     this.ghostKeys = [...game.frontier()].slice(0, GHOST_CAP);
     this.ghostSet = new Set(this.ghostKeys);
     this.ghostPos = this.ghostKeys.map((k) => toWorld(k));
-    this.ghosts.count = this.ghostKeys.length;
+    this.ghostRings.count = this.ghostKeys.length;
     const qPos = [];
     const want = new Map();
     this.ghostKeys.forEach((k, i) => {
@@ -2011,8 +2100,9 @@ export class World3D {
   styleGhosts(time) {
     const d = this.dummy;
     const c = this._c;
-    const pulse = 0.82 + 0.18 * Math.sin(time * 4);
+    const pulse = 0.85 + 0.15 * Math.sin(time * 3.5);
     const valid = this.validTint || c;
+    let fills = 0;
     for (let i = 0; i < this.ghostKeys.length; i++) {
       const k = this.ghostKeys[i];
       const { x, z } = this.ghostPos[i];
@@ -2020,13 +2110,26 @@ export class World3D {
       const isH = this.highlightKeys.has(k);
       const hover = k === this.hoverKey && (isV || isH);
       d.position.set(x, hover ? 0.16 : 0.11, z);
+      d.scale.setScalar(1);
       d.updateMatrix();
-      this.ghosts.setMatrixAt(i, d.matrix);
-      if (isV) c.copy(valid).multiplyScalar(hover ? 1.15 : pulse);
-      else if (isH) c.setHex(0xfff2a8).multiplyScalar(hover ? 1.1 : pulse);
-      else c.setHex(0xe6fbff);
-      this.ghosts.setColorAt(i, c);
+      this.ghostRings.setMatrixAt(i, d.matrix);
+      if (isV || isH) {
+        // where you can place (your colour) or scout (warm yellow): a soft pulsing fill
+        // (on blue water a yellow fill turns grey, so scouting gets a yellow rim and a cream fill)
+        c.copy(isV ? valid : c.setHex(0xffd24a)).multiplyScalar(hover ? 1.15 : pulse);
+        this.ghostRings.setColorAt(i, c);
+        if (!isV) c.setHex(0xfff6d8).multiplyScalar(hover ? 1.1 : pulse);
+        this.ghosts.setMatrixAt(fills, d.matrix);
+        this.ghosts.setColorAt(fills, c);
+        fills++;
+      } else {
+        this.ghostRings.setColorAt(i, c.setHex(0xffffff));
+      }
     }
+    this.ghostRings.count = this.ghostKeys.length;
+    this.ghosts.count = fills;
+    this.ghostRings.instanceMatrix.needsUpdate = true;
+    this.ghostRings.instanceColor.needsUpdate = true;
     this.ghosts.instanceMatrix.needsUpdate = true;
     this.ghosts.instanceColor.needsUpdate = true;
   }
@@ -2319,14 +2422,29 @@ export class World3D {
     dom.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
     dom.addEventListener('pointerup', (e) => {
       if (!down) return;
+      const touch = e.pointerType === 'touch' || e.pointerType === 'pen';
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       down = null;
-      if (moved > 6 || e.button !== 0 || this.menuMode) return;
+      // fingers wobble more than a mouse, so taps get a little more slack
+      if (moved > (touch ? 12 : 6) || e.button !== 0 || this.menuMode) return;
       const k = this.pick(e);
-      if (k && this.onClick) this.onClick(k);
+      if (k && this.onClick) this.onClick(k, { touch });
     });
-    dom.addEventListener('pointermove', (e) => { if (!this.menuMode) this._lastMove = e; });
-    dom.addEventListener('pointerleave', () => { this._lastMove = null; this.cursorPoint = null; this.setHover(null); });
+    // with a finger there is no hover: moving means dragging the map, so only mice update it
+    dom.addEventListener('pointermove', (e) => { if (!this.menuMode && e.pointerType === 'mouse') this._lastMove = e; });
+    dom.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      this._lastMove = null;
+      this.cursorPoint = null;
+      this.setHover(null);
+    });
+  }
+
+  // Touch: show what a tap would do (held tile + preview) without placing yet
+  hoverAt(k) {
+    const { x, z } = toWorld(k);
+    this.cursorPoint = new THREE.Vector3(x, 0.3, z);
+    this.setHover(k);
   }
 
   setHover(k, e) {
@@ -2417,11 +2535,18 @@ export class World3D {
     U.uTime.value = time;
     this.landingMat.uniforms.uTime.value = time;
     this.waterMat.uniforms.uTime.value = time;
+    this.now = time;
+    // a tile touched down since the last coastline? redraw it (at most ~7x a second)
+    if (this.landAt && !this.maskDirty && this.maskTimer <= 0 && this.landedKeys().length !== this.maskSig) this.maskDirty = true;
+    if (this.maskBlend < 1) {
+      this.maskBlend = Math.min(1, this.maskBlend + dt / MASK_FADE);
+      this.waterMat.uniforms.uMaskMix.value = this.maskBlend * this.maskBlend * (3 - 2 * this.maskBlend);
+    }
     // redraw the coastline at most ~4x per second, however many tiles change
     this.maskTimer -= dt;
     if (this.maskDirty && this.maskTimer <= 0) {
       this.updateMask();
-      this.maskTimer = 0.25;
+      this.maskTimer = 0.14;
     }
     this.weather.material.uniforms.uTime.value = time;
 

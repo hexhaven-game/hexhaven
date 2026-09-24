@@ -33,6 +33,8 @@ export function createWaterMaterial(maskTex, extent) {
       {
         uTime: { value: 0 },
         uMask: { value: null },
+        uMaskPrev: { value: null },
+        uMaskMix: { value: 1 },
         uExtent: { value: extent },
         uDeep: { value: new THREE.Color(0x3a9fd8) },
         uShallow: { value: new THREE.Color(0x5fe0da) },
@@ -57,7 +59,8 @@ export function createWaterMaterial(maskTex, extent) {
     `,
     fragmentShader: /* glsl */ `
       uniform float uTime;
-      uniform sampler2D uMask;
+      uniform sampler2D uMask, uMaskPrev;
+      uniform float uMaskMix;
       uniform float uExtent;
       uniform vec3 uDeep, uShallow, uSand, uFoam, uSunDir;
       uniform float uShore;
@@ -69,7 +72,7 @@ export function createWaterMaterial(maskTex, extent) {
         // uShore scales the whole coastline mask around the world origin, so the sand and foam
         // grow out of the sea in one smooth move while the banks are coming up
         vec2 maskUv = vWorld.xz / (uExtent * 2.0 * uShore) + 0.5;
-        vec4 mask = texture2D(uMask, maskUv);
+        vec4 mask = mix(texture2D(uMaskPrev, maskUv), texture2D(uMask, maskUv), uMaskMix);
         float coast = mask.r;   // narrow falloff around the tiles
         float shelf = mask.g;   // wide falloff: shallow water
 

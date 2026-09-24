@@ -89,6 +89,11 @@ node tools/sim.mjs 40   # 40 simulated games
 | `tools/sim.mjs` | headless AI balance simulator |
 | `public/` | static files served as-is: `robots.txt`, `sitemap.xml`, `llms.txt`, icons |
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md). The game reads the same file: click the version number in the
+main menu to open it.
+
 ## Deployment
 
 Every push to `main` builds the game with Vite and publishes `dist/` to GitHub Pages through
