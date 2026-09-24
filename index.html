@@ -115,13 +115,17 @@
       </noscript>
     </header>
     <div id="hud">
-      <div id="tl">
-        <button id="menuBtn" class="hexicon-btn" title="Menu (Esc)"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16v2H4zM4 11h16v2H4zM4 15h16v2H4z" /></svg></button>
-        <div id="players"></div>
-      </div>
+      <div id="players"></div>
       <div id="status"></div>
-      <div id="goal" class="hidden"></div>
-      <div id="score"></div>
+      <div id="hudright">
+        <div class="hudrow">
+          <div id="score"></div>
+          <button id="menuBtn" class="iconbtn" title="Menu (Esc)">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16v2H4zM4 11h16v2H4zM4 15h16v2H4z" /></svg>
+          </button>
+        </div>
+        <div id="goal" class="hidden"></div>
+      </div>
       <div id="hand"></div>
       <div id="panel" class="hidden"></div>
       <div id="synergy" class="hidden"></div>

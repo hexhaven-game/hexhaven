@@ -614,7 +614,7 @@ function positionSynergy() {
 }
 
 world.onHover = (k, e) => {
-  if (mode.kind === 'place') { renderStatus(); updateSynergy(); }
+  if (mode.kind === 'place') { renderGoal(); updateSynergy(); }
   const tip = $('#tooltip');
   if (!k || modalOpen() || !inGame || (mode.kind === 'place' && mode.valid.includes(k))) {
     tip.style.display = 'none';
@@ -679,31 +679,58 @@ function render() {
   if (!inGame) return;
   renderPlayers();
   renderStatus();
+  renderGoal();
   renderScore();
   renderHand();
   renderPanel();
 }
 
+// resources shown on the small player cards on the left
+const CARD_RES = ['gold', 'wood', 'wool'];
+
 function renderPlayers() {
   const cur = current();
   $('#players').innerHTML = game.players.map((p) => `
-    <div class="chip ${cur === p.id ? 'active' : ''}" style="--c:${hexColor(p.color)}" data-name="${p.name}${p.isAI ? '' : ' (you)'}">
-      <span class="hx">${p.name[0]}</span>
-      <span class="sc">${p.prosp}</span>
+    <div class="pcard ${cur === p.id ? 'active' : ''}" style="--c:${hexColor(p.color)}">
+      <div class="phead">
+        <span class="pname">${p.name}${p.isAI ? '' : '<em>you</em>'}</span>
+        <span class="pscore">${svg('crown')}${p.prosp}${p.isAI ? '' : `<small>/${WIN_GOAL}</small>`}</span>
+      </div>
+      <div class="pres">
+        ${CARD_RES.map((r) => `<span class="r" style="--rc:${RES_COLOR[r]}" title="${RES_INFO[r].name}">${svg(r)}<b>${p.res[r]}</b></span>`).join('')}
+      </div>
     </div>`).join('');
 }
 
-let goalSig = '';
+let statusSig = '';
 function renderStatus() {
   const S = SEASONS[game.season];
-  $('#status').innerHTML = `<span class="season">${S.name}</span><span class="round">${game.round} / ${game.lastRound}</span>`;
+  const me = human();
+  const left = me.actionsLeft;
+  const total = HOME_LEVELS[game.homeTile(me.id).level].actions;
+  const pips = Array.from({ length: total }, (_, i) => `<i class="${i >= left ? 'used' : ''}"></i>`).join('');
+  const placing = mode.kind === 'place' && mode.pid === me.id;
+  const sig = `${game.season}|${game.year}|${game.round}|${game.lastRound}|${left}|${me.freeExplore}|${total}|${placing}`;
+  if (sig === statusSig) return;
+  statusSig = sig;
+  $('#status').innerHTML = `
+    <span class="seg"><span class="sem">${S.icon}</span><b>${S.name}</b><span class="lbl">Year ${game.year}</span></span>
+    <i class="vdiv"></i>
+    <span class="seg lbl">Round ${game.round}<span class="of">/${game.lastRound}</span></span>
+    <i class="vdiv"></i>
+    ${placing
+      ? '<span class="seg"><span class="lbl">Place a tile</span></span>'
+      : `<span class="seg"><span class="gpips">${pips}</span><span class="lbl">${left} action${left === 1 ? '' : 's'} left</span>${me.freeExplore ? '<b class="free">+scout</b>' : ''}</span>`}`;
+}
 
+let goalSig = '';
+function renderGoal() {
   // The objective banner: what should I do right now?
   const cur = current();
   const p = cur != null ? game.players[cur] : null;
   let sig = 'none';
   let html = '';
-  const steps = (list, at) => `<div class="steps">${list.map((t, i) => `<span class="step ${i < at ? 'done' : i === at ? 'now' : ''}"><i>${i + 1}</i><span>${t}</span></span>`).join('<b class="sep"></b>')}</div>`;
+  const steps = (list, at) => `<div class="steps">${list.map((t, i) => `<span class="step ${i < at ? 'done' : i === at ? 'now' : ''}"><i>${i < at ? '✓' : i + 1}</i><span>${t}</span></span>`).join('<b class="sep"></b>')}</div>`;
   if (game.over) {
     sig = 'over';
   } else if (mode.kind === 'place') {
@@ -717,12 +744,14 @@ function renderStatus() {
   } else if (mode.kind === 'action') {
     const me = human();
     const left = me.actionsLeft;
-    const pips = Array.from({ length: HOME_LEVELS[game.homeTile(me.id).level].actions }, (_, i) => `<i class="${i >= left ? 'used' : ''}"></i>`).join('');
     sig = `action|${left}|${me.freeExplore}`;
     html = left > 0 || me.freeExplore
-      ? `<div class="goal-head"><span class="gpips">${pips}</span>${left} action${left === 1 ? '' : 's'} left</div>
-         <div class="goal-sub">Tap your farm, a field or a glowing tile${me.freeExplore ? ' · one free scout' : ''}</div>`
-      : `<div class="goal-head">All actions used</div><div class="goal-sub">Trade or sell if you like, then press Done</div>`;
+      ? `<div class="goal-head">All yours</div>
+         <div class="goal-sub">Tap your farm, a field or a glowing tile${me.freeExplore ? ' · one free scout' : ''}</div>
+         <div class="goal-foot">First to ${WIN_GOAL} prosperity wins</div>`
+      : `<div class="goal-head">Actions used</div>
+         <div class="goal-sub">Trade or sell if you like, then end your turn.</div>
+         <div class="goal-foot">First to ${WIN_GOAL} prosperity wins</div>`;
   } else if (p && !p.isAI) {
     sig = 'ready';
   } else if (p) {
@@ -770,14 +799,12 @@ function renderScore() {
   // build once, then only patch numbers so changes can animate
   if (!el.querySelector('.resbar')) {
     el.innerHTML = `
-      <div class="big"><span class="pv"></span><small>/${WIN_GOAL}</small>${svg('crown', 'ic crown')}</div>
       <button class="resbar" data-act="economy" title="Your economy (I)">
         ${RES.map((r) => `<span class="rs" data-r="${r}" style="--rc:${RES_COLOR[r]}" title="${RES_INFO[r].name}">
           <span class="ico">${svg(r)}</span><b></b><small></small></span>`).join('')}
       </button>
       <div class="orders"></div>`;
   }
-  el.querySelector('.pv').textContent = h.prosp;
   for (const r of RES) {
     const cell = el.querySelector(`.rs[data-r="${r}"]`);
     const b = cell.querySelector('b');
@@ -881,13 +908,16 @@ function renderHand() {
     const p = game.players[mode.pid];
     // rebuild only when the offer itself changes; picking a card just moves the selection
     const built = setHand(`place|${game.round}|${p.bonusTiles}|${p.offer.join(',')}`, `
-      <div class="cards">${p.offer.map((t, i) => `
-        <button class="tcard" data-act="sel-tile" data-i="${i}">
-          <img src="${world.thumb(t)}" alt="">
-          <span class="name">${TILE_TYPES[t].name}</span>
-          <span class="desc">${TILE_TYPES[t].desc}</span>
-          <kbd>${i + 1}</kbd>
-        </button>`).join('')}
+      <div class="tray">
+        <div class="tray-head">Choose 1 tile to place</div>
+        <div class="cards">${p.offer.map((t, i) => `
+          <button class="tcard" data-act="sel-tile" data-i="${i}">
+            <img src="${world.thumb(t)}" alt="">
+            <span class="name">${TILE_TYPES[t].name}</span>
+            <span class="desc">${TILE_TYPES[t].desc}</span>
+            <kbd>${i + 1}</kbd>
+          </button>`).join('')}
+        </div>
       </div>
       ${stack(p.offer[mode.sel])}`);
     const el = $('#hand');
@@ -914,7 +944,7 @@ function renderHand() {
           <button class="hexbtn" data-act="market" title="Market (M)">${svg('market')}<span>Market</span></button>
           <button class="hexbtn" data-act="trade" title="Trade (T)">${svg('trade')}<span>Trade</span></button>
           <button class="hexbtn" data-act="buy-tile" ${canBuy ? '' : 'disabled'} title="Buy an extra tile for next round (${game.tilePrice(p.id)} gold)">${svg('tile')}<span>+1 tile</span></button>
-          <button class="hexbtn go ${p.actionsLeft === 0 && !p.freeExplore ? 'nudge' : ''}" data-act="end" title="End turn (E)">${svg('next')}<span>Done</span></button>
+          <button class="hexbtn go ${p.actionsLeft === 0 && !p.freeExplore ? 'nudge' : ''}" data-act="end" title="End turn (E)">${svg('next')}<span>End Turn</span></button>
         </div>
       </div>
       ${stack(null)}`);
