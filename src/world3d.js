@@ -131,7 +131,8 @@ const G = {
   lip: () => geo('lip', () => new THREE.CylinderGeometry(1, 1, 0.03, 6).translate(0, TOP - 0.015, 0)),
   ghost: () => geo('ghost', () => new THREE.CylinderGeometry(0.93, 0.93, 0.03, 6)),
   slotFill: () => geo('slotFill', () => new THREE.CircleGeometry(0.9, 6, Math.PI / 6).rotateX(-Math.PI / 2)),
-  slotRing: () => geo('slotRing', () => new THREE.RingGeometry(0.86, 0.905, 6, 1, Math.PI / 6).rotateX(-Math.PI / 2)),
+  // the outline sits exactly on the hex edge, so neighbouring slots share one line instead of two
+  slotRing: () => geo('slotRing', () => new THREE.RingGeometry(0.975, 1.0, 6, 1, Math.PI / 6).rotateX(-Math.PI / 2)),
   box: () => geo('box', () => new THREE.BoxGeometry(1, 1, 1)),
   cyl: (seg = 8) => geo(`cyl${seg}`, () => new THREE.CylinderGeometry(1, 1, 1, seg)),
   cone: (seg = 8) => geo(`cone${seg}`, () => new THREE.ConeGeometry(1, 1, seg)),
@@ -1168,14 +1169,14 @@ export class World3D {
     // frontier ghosts: one instanced mesh + one Points draw for the '?' markers
     // open sea slots: a thin outline for every slot, a soft coloured fill only where you can act
     this.ghostRings = new THREE.InstancedMesh(G.slotRing(), new THREE.MeshBasicMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false,
+      color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false,
     }), GHOST_CAP);
     this.ghostRings.count = 0;
     this.ghostRings.setColorAt(0, new THREE.Color());
     this.ghostRings.frustumCulled = false;
     scene.add(this.ghostRings);
     this.ghosts = new THREE.InstancedMesh(G.slotFill(), new THREE.MeshBasicMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.42, depthWrite: false,
+      color: 0xffffff, transparent: true, opacity: 0.26, depthWrite: false,
     }), GHOST_CAP);
     this.ghosts.count = 0;
     this.ghosts.setColorAt(0, new THREE.Color());
@@ -1183,7 +1184,7 @@ export class World3D {
     scene.add(this.ghosts);
     const q = textTexture('?', { bg: null, fg: '#9fb3ad', size: 90, pad: 10 });
     this.qPoints = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({
-      map: q.tex, size: 0.5, transparent: true, opacity: 0.55, depthWrite: false, alphaTest: 0.05,
+      map: q.tex, size: 0.42, transparent: true, opacity: 0.3, depthWrite: false, alphaTest: 0.05,
     }));
     this.qPoints.frustumCulled = false;
     scene.add(this.qPoints);
@@ -1432,6 +1433,7 @@ export class World3D {
     this.previewGroup.clear();
     this.particles.list = [];
     this.anims = [];
+    this.animGen = (this.animGen || 0) + 1;
     this.camGoal = null;
     this.rebuildQueue?.clear();
     this.buildQueue = [];
@@ -1661,7 +1663,7 @@ export class World3D {
       ring.position.y = TOP + 0.006;
       g.add(ring);
     }
-    if (t.type === 'village' && !t.district) {
+    if (t.type === 'village' && !t.district && this.showNames !== false) {
       const label = textSprite('Haven', { bg: '#2f3a36', fg: '#f7d774', size: 40, pad: 22, scale: LABEL_SCALE * 1.2 });
       label.position.set(0, TOP + 2.25, 0);
       g.add(label);
@@ -2035,7 +2037,6 @@ export class World3D {
     this.ghostKeys = [...game.frontier()].slice(0, GHOST_CAP);
     this.ghostSet = new Set(this.ghostKeys);
     this.ghostPos = this.ghostKeys.map((k) => toWorld(k));
-    this.ghostRings.count = this.ghostKeys.length;
     const qPos = [];
     const want = new Map();
     this.ghostKeys.forEach((k, i) => {
@@ -2102,31 +2103,32 @@ export class World3D {
     const c = this._c;
     const pulse = 0.85 + 0.15 * Math.sin(time * 3.5);
     const valid = this.validTint || c;
-    let fills = 0;
+    // only spots you can use right now are drawn: placing (your colour) or scouting (yellow);
+    // the rest of the open sea stays plain water
+    let rings = 0, fills = 0;
     for (let i = 0; i < this.ghostKeys.length; i++) {
       const k = this.ghostKeys[i];
-      const { x, z } = this.ghostPos[i];
       const isV = this.validSet.has(k);
       const isH = this.highlightKeys.has(k);
-      const hover = k === this.hoverKey && (isV || isH);
+      if (!isV && !isH) continue;
+      const { x, z } = this.ghostPos[i];
+      const hover = k === this.hoverKey;
       d.position.set(x, hover ? 0.16 : 0.11, z);
       d.scale.setScalar(1);
       d.updateMatrix();
-      this.ghostRings.setMatrixAt(i, d.matrix);
-      if (isV || isH) {
-        // where you can place (your colour) or scout (warm yellow): a soft pulsing fill
-        // (on blue water a yellow fill turns grey, so scouting gets a yellow rim and a cream fill)
-        c.copy(isV ? valid : c.setHex(0xffd24a)).multiplyScalar(hover ? 1.15 : pulse);
-        this.ghostRings.setColorAt(i, c);
-        if (!isV) c.setHex(0xfff6d8).multiplyScalar(hover ? 1.1 : pulse);
+      c.copy(isV ? valid : c.setHex(0xffc23a)).multiplyScalar(hover ? 1.1 : pulse);
+      this.ghostRings.setMatrixAt(rings, d.matrix);
+      this.ghostRings.setColorAt(rings, c);
+      rings++;
+      // placing: a light fill in your colour; scouting: warm outline, filled on hover
+      if (isV || hover) {
+        if (!isV) c.setHex(0xfff2c8);
         this.ghosts.setMatrixAt(fills, d.matrix);
         this.ghosts.setColorAt(fills, c);
         fills++;
-      } else {
-        this.ghostRings.setColorAt(i, c.setHex(0xffffff));
       }
     }
-    this.ghostRings.count = this.ghostKeys.length;
+    this.ghostRings.count = rings;
     this.ghosts.count = fills;
     this.ghostRings.instanceMatrix.needsUpdate = true;
     this.ghostRings.instanceColor.needsUpdate = true;
@@ -2485,7 +2487,7 @@ export class World3D {
       const y = this.tileObjs.has(cur) ? TOP : SLOT_Y;
       const p = this._planePoint(y);
       const c = toWorld(cur);
-      if (p && Math.hypot(p.x - c.x, p.z - c.z) < 0.93 && (this.tileObjs.has(cur) || this.ghostSet.has(cur))) {
+      if (p && Math.hypot(p.x - c.x, p.z - c.z) < 0.93 && (this.tileObjs.has(cur) || this._usable(cur))) {
         // a raised tile in front still wins (it covers the slot on screen)
         const kt = this._hexAt(TOP);
         if (!(kt && kt !== cur && this.tileObjs.has(kt))) return cur;
@@ -2494,8 +2496,13 @@ export class World3D {
     const kt = this._hexAt(TOP);
     if (kt && this.tileObjs.has(kt)) return kt;
     const kg = this._hexAt(SLOT_Y);
-    if (kg && this.ghostSet.has(kg)) return kg;
+    if (kg && this._usable(kg)) return kg;
     return null;
+  }
+
+  // open sea only reacts where there's something to do: a placing or scouting spot
+  _usable(k) {
+    return this.ghostSet.has(k) && (this.validSet.has(k) || this.highlightKeys.has(k));
   }
 
   updateBirds(time, dt) {
@@ -2572,7 +2579,12 @@ export class World3D {
       }
     }
     if (this.anims.length) this.shadowFrames = Math.max(this.shadowFrames, 1);
-    this.anims = this.anims.filter((a) => {
+    // swap the list out first: callbacks may start new animations (a landing tile fires its
+    // shockwave), and those must land in the next list instead of being dropped by the filter
+    const running = this.anims;
+    const gen = this.animGen;
+    this.anims = [];
+    const kept = running.filter((a) => {
       a.t += dt;
       if (a.t < 0) return true;
       const k = Math.min(1, a.t / a.dur);
@@ -2580,6 +2592,8 @@ export class World3D {
       if (k >= 1) { a.done?.(); return false; }
       return true;
     });
+    // a reset() from inside a callback wipes everything that was running
+    this.anims = gen === this.animGen ? kept.concat(this.anims) : this.anims;
 
     this._smokeT = (this._smokeT || 0) + dt;
     const smoke = this._smokeT > 0.5;

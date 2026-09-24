@@ -2,6 +2,18 @@
 
 All notable changes to Hexhaven. The game reads this file too: the version in the main menu opens it.
 
+## 0.3 — 24-09-2026
+
+### Improved
+- The open sea stays calm: only spots where you can place (your colour) or scout (yellow) are drawn and clickable, so tapping empty water does nothing.
+- Slot outlines sit on the hex edge, so neighbouring spots share one line instead of two.
+- Haven orders live in one small labelled card with what Haven wants and what it pays; on phones it only shows up when you can deliver.
+- The pause button on desktop is a small round button lined up with the resource bar.
+- The title island no longer shows the Haven label, and the swell rings on the water are softer.
+
+### Fixed
+- White hex outlines from the title island's landing effect no longer stay behind in the sea after starting or loading a game.
+
 ## 0.2 — 24-09-2026
 
 ### New

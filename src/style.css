@@ -817,17 +817,49 @@ input, textarea { -webkit-user-select: text; user-select: text; }
   }
 }
 
-/* orders: readable parchment chips; a green ring + "Deliver" when you can fill one */
-#score .order {
-  display: flex; align-items: center; gap: 5px;
+/* orders: one parchment card with a small title, a row per order; "Deliver" when you can fill one */
+#score .orders {
+  display: flex; flex-direction: column; gap: 2px; min-width: 150px;
   background: var(--parch); color: var(--parch-ink);
-  border: 1px solid var(--parch-line); border-radius: 999px;
-  padding: 5px 12px; font: 700 12.5px Nunito, sans-serif;
+  border: 1px solid var(--parch-line); border-radius: 14px; padding: 7px 8px 6px;
   box-shadow: 0 3px 10px rgba(20, 34, 32, 0.16);
 }
+#score .orders .oh {
+  display: flex; align-items: center; gap: 5px; padding: 0 4px 3px;
+  font: 800 10.5px Nunito, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--parch-dim);
+}
+#score .orders .oh .ic { width: 12px; height: 12px; color: var(--warn); }
+#score .order {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  background: transparent; color: var(--parch-ink); border: 0; border-radius: 9px;
+  padding: 5px 6px; font: 700 12.5px Nunito, sans-serif; box-shadow: none;
+}
+#score .order + .order { border-top: 1px solid var(--parch-line); border-radius: 0 0 9px 9px; }
 #score .order:disabled { opacity: 1; cursor: default; }
 #score .order .ic { width: 14px; height: 14px; }
-#score .order > .ic:first-child { color: var(--warn); }
 #score .order .arrow { color: var(--parch-dim); }
-#score .order.ready { box-shadow: 0 0 0 2px var(--accent), 0 3px 10px rgba(20, 34, 32, 0.16); }
+#score .order .pay { display: flex; align-items: center; gap: 5px; }
+#score .order .pr { color: var(--accent); }
+#score .order.ready { background: rgba(88, 160, 60, 0.12); }
 #score .order em { font-style: normal; background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 8px; margin-left: 2px; }
+
+/* desktop: the pause button is the quiet end-cap of the resource bar, not a separate block */
+@media (min-width: 761px) {
+  /* the row also holds the order chips under the bar, so pin to the top and match the bar's height */
+  #hudright .hudrow { align-items: flex-start; gap: 6px; }
+  #menuBtn {
+    width: 33px; height: 33px; border-radius: 50%; flex: none;
+    background: rgba(34, 48, 47, 0.72); color: var(--panel-dim);
+    box-shadow: 0 6px 14px rgba(14, 30, 28, 0.22);
+  }
+  #menuBtn .ic { width: 15px; height: 15px; }
+  #menuBtn:hover:not(:disabled) { background: var(--panel); color: var(--panel-ink); transform: none; }
+}
+
+/* phones: the orders card only appears when you can deliver, as a compact strip without title */
+@media (max-width: 760px) {
+  #score .orders:not(:has(.ready)) { display: none; }
+  #score .orders { min-width: 0; padding: 3px 4px; border-radius: 12px; }
+  #score .orders .oh { display: none; }
+  #score .order { font-size: 11.5px; }
+}

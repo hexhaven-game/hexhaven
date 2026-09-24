@@ -90,7 +90,7 @@ export function createWaterMaterial(maskTex, extent) {
 
         // soft rings rolling towards the coast
         float rings = smoothstep(0.75, 1.0, 0.5 + 0.5 * sin(shelf * 26.0 + t * 1.6)) * smoothstep(0.15, 0.4, shelf) * (1.0 - smoothstep(0.3, 0.42, coast));
-        col = mix(col, uFoam, rings * 0.28);
+        col = mix(col, uFoam, rings * 0.07); // just a hint of swell rolling in, no bright bands
 
         // sandy rim right at the tile edges, with a foam line that breathes
         // keep the rim and foam line hugging the hexagonal coast instead of wobbling into a beach

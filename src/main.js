@@ -920,10 +920,13 @@ function renderScore() {
     cell.querySelector('small').textContent = inc[r] ? `+${inc[r]}` : '';
   }
   lastRes = { ...h.res };
-  el.querySelector('.orders').innerHTML = game.requests.map((q, i) => {
+  // one small card: what Haven wants, what it pays; an order you can fill gets a Deliver button
+  el.querySelector('.orders').innerHTML = `<div class="oh">${svg('flag')} Haven orders</div>` + game.requests.map((q, i) => {
     const ok = canDeliver && h.res[q.res] >= q.amount;
-    return `<button class="order ${ok ? 'ready' : ''}" data-act="deliver" data-i="${i}" ${ok ? '' : 'disabled'} title="Order from Haven">
-      ${svg('flag')} ${amount({ [q.res]: q.amount })} <span class="arrow">→</span> ${amount({ gold: q.gold })} +${q.prosp}${ok ? '<em>Deliver</em>' : ''}</button>`;
+    return `<button class="order ${ok ? 'ready' : ''}" data-act="deliver" data-i="${i}" ${ok ? '' : 'disabled'}
+      title="Haven wants ${q.amount} ${q.res}, pays ${q.gold} gold and ${q.prosp} prosperity">
+      <span class="want">${amount({ [q.res]: q.amount })}</span><span class="arrow">→</span>
+      <span class="pay">${amount({ gold: q.gold })} <span class="pr">+${q.prosp}</span></span>${ok ? '<em>Deliver</em>' : ''}</button>`;
   }).join('');
 }
 
